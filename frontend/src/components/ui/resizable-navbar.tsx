@@ -16,7 +16,7 @@ interface NavbarProps {
 }
 
 interface NavBodyProps {
-  children: React.ReactNode;
+  children: React.ReactNode | ((props: { visible?: boolean }) => React.ReactNode);
   className?: string;
   visible?: boolean;
 }
@@ -64,7 +64,7 @@ export const Navbar = ({ children, className }: NavbarProps) => {
   return (
     <motion.div
       ref={ref}
-      className={cn("fixed inset-x-0 top-0 z-50 w-full", className)}
+      className={cn("fixed inset-x-0 top-2 z-50 w-full", className)}
     >
       {React.Children.map(children, (child) =>
         React.isValidElement(child)
@@ -103,7 +103,7 @@ export const NavBody = ({ children, className, visible }: NavBodyProps) => {
         className,
       )}
     >
-      {children}
+      {typeof children === 'function' ? children({ visible }) : children}
     </motion.div>
   );
 };
@@ -115,7 +115,7 @@ export const NavItems = ({ items, className, onItemClick }: NavItemsProps) => {
     <motion.div
       onMouseLeave={() => setHovered(null)}
       className={cn(
-        "absolute inset-0 hidden flex-1 flex-row items-center justify-center space-x-2 text-sm font-medium text-zinc-600 transition duration-200 hover:text-zinc-800 lg:flex lg:space-x-2 font-roboto",
+        "absolute inset-0 hidden flex-1 flex-row items-center justify-center space-x-4 text-sm font-medium text-zinc-600 transition duration-200 hover:text-zinc-800 lg:flex lg:space-x-2 font-roboto",
         className,
       )}
     >
@@ -123,7 +123,7 @@ export const NavItems = ({ items, className, onItemClick }: NavItemsProps) => {
         <a
           onMouseEnter={() => setHovered(idx)}
           onClick={onItemClick}
-          className="relative px-4 py-2 text-neutral-600 dark:text-neutral-300 font-medium"
+          className="relative px-6 py-2 text-neutral-600 dark:text-neutral-300 font-medium"
           key={`link-${idx}`}
           href={item.link}
         >
@@ -225,18 +225,27 @@ export const MobileNavToggle = ({
   );
 };
 
-export const NavbarLogo = () => {
+export const NavbarLogo = ({ visible }: { visible?: boolean }) => {
   return (
     <a
       href="#"
-      className="relative z-20 mr-4 flex items-center space-x-3 px-2 py-1"
+      className="relative z-20 flex items-center space-x-3 px-2 py-1"
     >
-      <div className="w-10 h-10 bg-gradient-to-br from-black to-slate-900 rounded-xl flex items-center justify-center shadow-lg">
-        <span className="text-white font-bold text-lg">Z</span>
+      <div className="w-11 h-11 bg-gradient-to-br from-gray-900 via-gray-800 to-black rounded-2xl flex items-center justify-center shadow-lg border border-gray-700/50 hover:shadow-xl transition-all duration-200 ml-6">
+        <span className="text-white font-bold text-xl font-roboto-condensed tracking-tight">Z</span>
       </div>
-      <span className="font-roboto-condensed font-bold text-2xl text-black dark:text-white tracking-wide">
-        Zonata
-      </span>
+      <AnimatePresence>
+        {!visible && (
+          <motion.span 
+            initial={{ opacity: 1, width: "auto" }}
+            exit={{ opacity: 0, width: 0 }}
+            transition={{ duration: 0.2 }}
+            className="font-roboto-condensed font-bold text-2xl text-black dark:text-white tracking-wide overflow-hidden"
+          >
+            z0nata
+          </motion.span>
+        )}
+      </AnimatePresence>
     </a>
   );
 };
@@ -247,6 +256,8 @@ export const NavbarButton = ({
   children,
   className,
   variant = "primary",
+  visible,
+  compactText,
   ...props
 }: {
   href?: string;
@@ -254,6 +265,8 @@ export const NavbarButton = ({
   children: React.ReactNode;
   className?: string;
   variant?: "primary" | "secondary" | "dark" | "gradient";
+  visible?: boolean;
+  compactText?: string;
 } & (
   | React.ComponentPropsWithoutRef<"a">
   | React.ComponentPropsWithoutRef<"button">
@@ -270,13 +283,25 @@ export const NavbarButton = ({
       "bg-gradient-to-b from-blue-500 to-blue-700 text-white shadow-[0px_2px_0px_0px_rgba(255,255,255,0.3)_inset]",
   };
 
+  const displayText = visible && compactText ? compactText : children;
+
   return (
     <Tag
       href={href || undefined}
       className={cn(baseStyles, variantStyles[variant], className)}
       {...props}
     >
-      {children}
+      <AnimatePresence mode="wait">
+        <motion.span
+          key={visible ? 'compact' : 'full'}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.2 }}
+        >
+          {displayText}
+        </motion.span>
+      </AnimatePresence>
     </Tag>
   );
 }; 

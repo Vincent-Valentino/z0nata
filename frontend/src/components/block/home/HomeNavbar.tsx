@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { 
   Navbar, 
   NavBody, 
@@ -15,10 +16,10 @@ export const HomeNavbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const navItems = [
-    { name: "Home", link: "#home" },
-    { name: "Courses", link: "#courses" },
-    { name: "Student Test", link: "#student-test" },
-    { name: "Kahoot", link: "#kahoot" },
+    { name: "Home", link: "/" },
+    { name: "Dokumentasi", link: "/dokumentasi" },
+    { name: "Mock Test", link: "/mock-test" },
+    { name: "Time Quiz", link: "/time-quiz" },
   ]
 
   const handleMobileMenuToggle = () => {
@@ -33,19 +34,34 @@ export const HomeNavbar = () => {
     <Navbar>
       {/* Desktop Navigation */}
       <NavBody>
-        <NavbarLogo />
-        <NavItems items={navItems} />
-        <div className="flex items-center gap-4">
-          <NavbarButton variant="primary" href="#login">
-            Log into Account
-          </NavbarButton>
-        </div>
+        {({ visible }: { visible?: boolean }) => (
+          <>
+            <Link to="/">
+              <NavbarLogo visible={visible} />
+            </Link>
+            <NavItems items={navItems} />
+            <div className="flex items-center gap-4 px-2 py-4">
+              <Link to="/login">
+                <NavbarButton 
+                  variant="primary" 
+                  as="div"
+                  visible={visible}
+                  compactText="Sign In"
+                >
+                  Log into Account
+                </NavbarButton>
+              </Link>
+            </div>
+          </>
+        )}
       </NavBody>
       
       {/* Mobile Navigation */}
       <MobileNav>
         <MobileNavHeader>
-          <NavbarLogo />
+          <Link to="/">
+            <NavbarLogo />
+          </Link>
           <MobileNavToggle 
             isOpen={isMobileMenuOpen} 
             onClick={handleMobileMenuToggle} 
@@ -57,23 +73,26 @@ export const HomeNavbar = () => {
           onClose={handleMobileMenuClose}
         >
           {navItems.map((item, idx) => (
-            <a
+            <Link
               key={`mobile-link-${idx}`}
-              href={item.link}
-              className="relative text-neutral-600 dark:text-neutral-300 font-roboto font-medium hover:text-emerald-600 transition-colors duration-200"
+              to={item.link}
+              className="relative font-roboto font-medium hover:text-emerald-600 transition-colors duration-200"
               onClick={handleMobileMenuClose}
             >
               <span className="block">{item.name}</span>
-            </a>
+            </Link>
           ))}
           <div className="flex w-full flex-col gap-4">
-            <NavbarButton
-              onClick={handleMobileMenuClose}
-              variant="primary"
-              className="w-full"
-            >
-              Log into Account
-            </NavbarButton>
+            <Link to="/login">
+              <NavbarButton
+                onClick={handleMobileMenuClose}
+                variant="primary"
+                className="w-full"
+                as="div"
+              >
+                Log into Account
+              </NavbarButton>
+            </Link>
           </div>
         </MobileNavMenu>
       </MobileNav>

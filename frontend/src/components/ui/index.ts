@@ -21,4 +21,5 @@ export {
   MobileNavToggle, 
   NavbarLogo, 
   NavbarButton 
-} from './resizable-navbar' 
+} from './resizable-navbar'
+export { Tooltip } from './Tooltip' 
