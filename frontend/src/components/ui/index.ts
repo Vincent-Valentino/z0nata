@@ -22,4 +22,5 @@ export {
   NavbarLogo, 
   NavbarButton 
 } from './resizable-navbar'
-export { Tooltip } from './Tooltip' 
+export { Tooltip } from './Tooltip'
+export { Command, CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandShortcut, CommandSeparator } from './command' 

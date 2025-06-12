@@ -105,9 +105,21 @@ func (s *userService) initOAuthConfigs() {
 }
 
 func (s *userService) Register(ctx context.Context, req *models.RegisterRequest) (*models.AuthResponse, error) {
-	// Check if user already exists
+	// Check if user already exists in any collection
 	existing, _ := s.userRepo.GetByEmail(ctx, req.Email)
 	if existing != nil {
+		return nil, errors.New("user with this email already exists")
+	}
+
+	// Check mahasiswa collection
+	existingMahasiswa, _ := s.userRepo.GetMahasiswaByEmail(ctx, req.Email)
+	if existingMahasiswa != nil {
+		return nil, errors.New("user with this email already exists")
+	}
+
+	// Check admin collection
+	existingAdmin, _ := s.userRepo.GetAdminByEmail(ctx, req.Email)
+	if existingAdmin != nil {
 		return nil, errors.New("user with this email already exists")
 	}
 
@@ -554,7 +566,7 @@ func (s *userService) OAuthLogin(ctx context.Context, req *models.OAuthRequest) 
 	}
 
 	// Create new user
-	return s.createOAuthUser(ctx, email, name, picture, req.Provider, oauthID, req.UserType)
+	return s.createOAuthUser(ctx, email, name, picture, req.Provider, oauthID, string(req.UserType))
 }
 
 func (s *userService) VerifyEmail(ctx context.Context, token string) error {

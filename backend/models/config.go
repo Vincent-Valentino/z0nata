@@ -14,7 +14,7 @@ type ServerConfig struct {
 	Port            string        `json:"port" env:"PORT" env-default:"8080"`
 	Host            string        `json:"host" env:"HOST" env-default:"localhost"`
 	Environment     string        `json:"environment" env:"ENVIRONMENT" env-default:"development"`
-	AllowedOrigins  []string      `json:"allowed_origins" env:"ALLOWED_ORIGINS" env-default:"http://localhost:3000"`
+	AllowedOrigins  []string      `json:"allowed_origins" env:"ALLOWED_ORIGINS" env-default:"http://localhost:5173"`
 	ReadTimeout     time.Duration `json:"read_timeout" env:"READ_TIMEOUT" env-default:"30s"`
 	WriteTimeout    time.Duration `json:"write_timeout" env:"WRITE_TIMEOUT" env-default:"30s"`
 	ShutdownTimeout time.Duration `json:"shutdown_timeout" env:"SHUTDOWN_TIMEOUT" env-default:"10s"`

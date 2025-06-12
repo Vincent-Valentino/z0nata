@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -14,8 +15,13 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  TrendingUp
+  TrendingUp,
+  Loader2,
+  RefreshCw,
+  ExternalLink
 } from 'lucide-react'
+import { adminService, type AdminStats, type ActivityLogItem } from '@/services/adminService'
+import { useAuthStore } from '@/store/authStore'
 
 interface StatCard {
   title: string
@@ -28,91 +34,96 @@ interface StatCard {
   }
 }
 
-interface ActivityLog {
-  id: string
-  type: 'user_registration' | 'question_added' | 'doc_updated' | 'admin_action'
-  message: string
-  timestamp: string
-  user: string
-  userType?: 'mahasiswa_mikroskiul' | 'not_mahasiswa'
+interface AdminOverviewProps {
+  onSectionChange?: (section: 'users' | 'questions' | 'documentation' | 'settings') => void
 }
 
-export const AdminOverview = () => {
-  // Mock data - replace with real API calls
-  const stats: StatCard[] = [
-    {
-      title: 'Total Users',
-      value: 1247,
-      description: 'Registered users',
-      icon: <Users className="h-4 w-4" />,
-      trend: { value: '+12%', isPositive: true }
-    },
-    {
-      title: 'Mahasiswa Mikroskiul',
-      value: 892,
-      description: 'Verified students',
-      icon: <GraduationCap className="h-4 w-4" />,
-      trend: { value: '+8%', isPositive: true }
-    },
-    {
-      title: 'Non-Mahasiswa',
-      value: 355,
-      description: 'External users',
-      icon: <Users className="h-4 w-4" />,
-      trend: { value: '+4%', isPositive: true }
-    },
-    {
-      title: 'Pending Access',
-      value: 23,
-      description: 'Awaiting approval',
-      icon: <AlertCircle className="h-4 w-4" />,
-      trend: { value: '+15%', isPositive: false }
+export const AdminOverview = ({ onSectionChange }: AdminOverviewProps) => {
+  const { user } = useAuthStore()
+  const [adminStats, setAdminStats] = useState<AdminStats | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+
+  // Load admin statistics
+  const loadAdminStats = async (showRefreshing = false) => {
+    try {
+      if (showRefreshing) {
+        setRefreshing(true)
+      } else {
+        setLoading(true)
+      }
+      setError(null)
+      
+      const stats = await adminService.getAdminStats()
+      setAdminStats(stats)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load admin statistics')
+      console.error('Error loading admin stats:', err)
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
     }
-  ]
+  }
 
-  const questionStats = [
-    { type: 'Single Choice', count: 456, color: 'bg-blue-500' },
-    { type: 'Multiple Choice', count: 234, color: 'bg-green-500' },
-    { type: 'Essays', count: 127, color: 'bg-purple-500' }
-  ]
+  useEffect(() => {
+    loadAdminStats()
+  }, [])
 
-  const docStats = [
-    { type: 'Modules', count: 24, color: 'bg-orange-500' },
-    { type: 'Submodules', count: 156, color: 'bg-cyan-500' }
-  ]
+  // Generate statistics cards from real data
+  const getStatsCards = (): StatCard[] => {
+    if (!adminStats) return []
 
-  const recentActivity: ActivityLog[] = [
-    {
-      id: '1',
-      type: 'user_registration',
-      message: 'New user registered',
-      timestamp: '2 minutes ago',
-      user: 'john.doe@student.ac.id',
-      userType: 'mahasiswa_mikroskiul'
-    },
-    {
-      id: '2',
-      type: 'question_added',
-      message: 'New multiple choice question added',
-      timestamp: '15 minutes ago',
-      user: 'admin@zonata.com'
-    },
-    {
-      id: '3',
-      type: 'user_registration',
-      message: 'Access request submitted',
-      timestamp: '32 minutes ago',
-      user: 'external.user@gmail.com',
-      userType: 'not_mahasiswa'
-    },
-    {
-      id: '4',
-      type: 'doc_updated',
-      message: 'Documentation module updated',
-      timestamp: '1 hour ago',
-      user: 'admin@zonata.com'
-    }
-  ]
+    return [
+      {
+        title: 'Total Users',
+        value: adminStats.users.totalUsers.toLocaleString(),
+        description: 'Registered users',
+        icon: <Users className="h-4 w-4" />,
+        trend: { value: `+${adminStats.users.recentRegistrations}`, isPositive: true }
+      },
+      {
+        title: 'Mahasiswa Mikroskil',
+        value: adminStats.users.mahasiswaUsers.toLocaleString(),
+        description: 'Verified students',
+        icon: <GraduationCap className="h-4 w-4" />,
+        trend: { value: '+8%', isPositive: true }
+      },
+      {
+        title: 'External Users',
+        value: adminStats.users.externalUsers.toLocaleString(),
+        description: 'Non-student users',
+        icon: <Users className="h-4 w-4" />,
+        trend: { value: '+4%', isPositive: true }
+      },
+      {
+        title: 'Pending Approval',
+        value: adminStats.users.pendingUsers,
+        description: 'Awaiting review',
+        icon: <AlertCircle className="h-4 w-4" />,
+        trend: { value: '+15%', isPositive: false }
+      }
+    ]
+  }
+
+  const getQuestionStats = () => {
+    if (!adminStats) return []
+    
+    return [
+      { type: 'Single Choice', count: adminStats.questions.singleChoice, color: 'bg-blue-500' },
+      { type: 'Multiple Choice', count: adminStats.questions.multipleChoice, color: 'bg-green-500' },
+      { type: 'Essays', count: adminStats.questions.essay, color: 'bg-purple-500' }
+    ]
+  }
+
+  const getDocumentationStats = () => {
+    if (!adminStats) return []
+    
+    return [
+      { type: 'Modules', count: adminStats.content.totalModules, color: 'bg-orange-500' },
+      { type: 'Submodules', count: adminStats.content.totalSubmodules, color: 'bg-cyan-500' }
+    ]
+  }
 
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -126,36 +137,129 @@ export const AdminOverview = () => {
 
   const getActivityColor = (type: string) => {
     switch (type) {
-      case 'user_registration': return 'bg-green-100 text-green-700'
-      case 'question_added': return 'bg-blue-100 text-blue-700'
-      case 'doc_updated': return 'bg-purple-100 text-purple-700'
-      case 'admin_action': return 'bg-orange-100 text-orange-700'
-      default: return 'bg-gray-100 text-gray-700'
+      case 'user_registration': return 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+      case 'question_added': return 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+      case 'doc_updated': return 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300'
+      case 'admin_action': return 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300'
+      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
     }
   }
 
   const getUserTypeBadge = (userType?: string) => {
-    if (userType === 'mahasiswa_mikroskiul') {
+    if (userType === 'mahasiswa') {
       return <Badge variant="default" className="bg-green-100 text-green-700 text-xs">Student</Badge>
     }
-    if (userType === 'not_mahasiswa') {
+    if (userType === 'external') {
       return <Badge variant="secondary" className="bg-orange-100 text-orange-700 text-xs">External</Badge>
+    }
+    if (userType === 'admin') {
+      return <Badge variant="outline" className="bg-blue-100 text-blue-700 text-xs">Admin</Badge>
     }
     return null
   }
 
+  const formatRelativeTime = (timestamp: string) => {
+    const now = new Date()
+    const time = new Date(timestamp)
+    const diffMs = now.getTime() - time.getTime()
+    const diffMins = Math.floor(diffMs / (1000 * 60))
+    
+    if (diffMins < 1) return 'just now'
+    if (diffMins < 60) return `${diffMins} minutes ago`
+    if (diffMins < 1440) return `${Math.floor(diffMins / 60)} hours ago`
+    return `${Math.floor(diffMins / 1440)} days ago`
+  }
+
+  // Handle navigation to specific sections
+  const handleQuickAction = (action: string) => {
+    if (onSectionChange) {
+      switch (action) {
+        case 'questions':
+          onSectionChange('questions')
+          break
+        case 'documentation':
+          onSectionChange('documentation')
+          break
+        case 'users':
+          onSectionChange('users')
+          break
+        default:
+          console.log(`Navigate to ${action}`)
+      }
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading admin overview...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
+          <CardContent className="flex items-center gap-3 pt-6">
+            <AlertCircle className="h-5 w-5 text-red-600" />
+            <div>
+              <p className="font-medium text-red-800 dark:text-red-200">Failed to load admin data</p>
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            </div>
+            <Button 
+              onClick={() => loadAdminStats()} 
+              variant="outline" 
+              size="sm"
+              className="ml-auto"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!adminStats) return null
+
+  const statsCards = getStatsCards()
+  const questionStats = getQuestionStats()
+  const docStats = getDocumentationStats()
+
   return (
     <div className="space-y-6">
+      {/* Header with refresh button */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Admin Overview</h2>
+          <p className="text-muted-foreground">System statistics and recent activity</p>
+        </div>
+        <Button 
+          onClick={() => loadAdminStats(true)} 
+          variant="outline" 
+          size="sm"
+          disabled={refreshing}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'Refreshing...' : 'Refresh'}
+        </Button>
+      </div>
+
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <Card key={stat.title}>
+        {statsCards.map((stat) => (
+          <Card key={stat.title} className="hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
               {stat.icon}
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{stat.value}</div>
               <div className="flex items-center justify-between">
                 <p className="text-xs text-muted-foreground">{stat.description}</p>
                 {stat.trend && (
@@ -184,17 +288,29 @@ export const AdminOverview = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3">
-          <Button className="w-full justify-start gap-2" variant="outline">
+          <Button 
+            className="w-full justify-start gap-2" 
+            variant="outline"
+            onClick={() => handleQuickAction('questions')}
+          >
             <FileText className="h-4 w-4" />
             Add Question
           </Button>
-          <Button className="w-full justify-start gap-2" variant="outline">
+          <Button 
+            className="w-full justify-start gap-2" 
+            variant="outline"
+            onClick={() => handleQuickAction('documentation')}
+          >
             <BookOpen className="h-4 w-4" />
             Add Documentation
           </Button>
-          <Button className="w-full justify-start gap-2" variant="outline">
-            <Share2 className="h-4 w-4" />
-            Admin Information
+          <Button 
+            className="w-full justify-start gap-2" 
+            variant="outline"
+            onClick={() => handleQuickAction('users')}
+          >
+            <Users className="h-4 w-4" />
+            Manage Users
           </Button>
         </CardContent>
       </Card>
@@ -225,7 +341,11 @@ export const AdminOverview = () => {
             <div className="pt-2 border-t">
               <div className="flex items-center justify-between font-medium">
                 <span>Total Questions</span>
-                <span>{questionStats.reduce((sum, stat) => sum + stat.count, 0)}</span>
+                <span>{adminStats.content.totalQuestions}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm text-muted-foreground mt-1">
+                <span>Active Questions</span>
+                <span>{adminStats.questions.activeQuestions}</span>
               </div>
             </div>
           </CardContent>
@@ -250,6 +370,16 @@ export const AdminOverview = () => {
                 <span className="text-2xl font-bold">{stat.count}</span>
               </div>
             ))}
+            <div className="pt-2 border-t text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Published</span>
+                <span className="font-medium">{adminStats.content.publishedModules}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Draft</span>
+                <span className="font-medium">{adminStats.content.draftModules}</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -263,7 +393,7 @@ export const AdminOverview = () => {
             <CardDescription>Latest system events</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {recentActivity.map((activity) => (
+            {adminStats.activity.recentActivity.map((activity) => (
               <div key={activity.id} className="flex items-start gap-3">
                 <div className={`p-2 rounded-full ${getActivityColor(activity.type)}`}>
                   {getActivityIcon(activity.type)}
@@ -276,12 +406,13 @@ export const AdminOverview = () => {
                   </div>
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {activity.timestamp}
+                    {formatRelativeTime(activity.timestamp)}
                   </p>
                 </div>
               </div>
             ))}
             <Button variant="ghost" className="w-full">
+              <ExternalLink className="h-4 w-4 mr-2" />
               View All Activity
             </Button>
           </CardContent>

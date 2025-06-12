@@ -40,6 +40,9 @@ func main() {
 
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db)
+	moduleRepo := repository.NewModuleRepository(db)
+	userActivityRepo := repository.NewUserActivityRepository(db)
+	questionRepo := repository.NewQuestionRepository(db)
 
 	// Initialize utilities
 	jwtManager := utils.NewJWTManager(cfg.JWT)
@@ -47,9 +50,15 @@ func main() {
 
 	// Initialize services
 	userService := services.NewUserService(userRepo, jwtManager, emailService, cfg)
+	moduleService := services.NewModuleService(moduleRepo)
+	userActivityService := services.NewUserActivityService(userActivityRepo)
+	questionService := services.NewQuestionService(questionRepo)
 
 	// Initialize controllers
 	userController := controllers.NewUserController(userService)
+	moduleController := controllers.NewModuleController(moduleService)
+	userActivityController := controllers.NewUserActivityController(userActivityService)
+	questionController := controllers.NewQuestionController(questionService)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(jwtManager)
@@ -74,8 +83,16 @@ func main() {
 	// API version prefix
 	api := router.Group("/api/v1")
 
+	// Create shared admin group to avoid route conflicts
+	admin := api.Group("/admin")
+	admin.Use(authMiddleware.RequireAuth())
+	admin.Use(authMiddleware.RequireAdmin())
+
 	// Setup routes
-	routes.SetupAuthRoutes(api, userController, authMiddleware)
+	routes.SetupAuthRoutes(api, userController, authMiddleware, admin)
+	routes.SetupModuleRoutes(api, moduleController, authMiddleware, admin)
+	routes.SetupUserActivityRoutes(api, userActivityController, authMiddleware)
+	routes.SetupQuestionRoutes(api, questionController, authMiddleware, admin)
 
 	// API documentation endpoint
 	api.GET("/docs", func(c *gin.Context) {
@@ -104,9 +121,20 @@ func main() {
 					"GET /mahasiswa/dashboard": "Mahasiswa dashboard (requires mahasiswa auth)",
 				},
 				"admin": gin.H{
-					"GET    /admin/users":     "Get all users (requires admin auth)",
-					"DELETE /admin/users/:id": "Delete user (requires admin auth)",
-					"GET    /admin/dashboard": "Admin dashboard (requires admin auth)",
+					"GET    /admin/users":                "Get all users (requires admin auth)",
+					"DELETE /admin/users/:id":            "Delete user (requires admin auth)",
+					"GET    /admin/dashboard":            "Admin dashboard (requires admin auth)",
+					"POST   /admin/questions":            "Create new question (requires admin auth)",
+					"GET    /admin/questions":            "List questions with filtering (requires admin auth)",
+					"GET    /admin/questions/:id":        "Get specific question (requires admin auth)",
+					"PUT    /admin/questions/:id":        "Update question (requires admin auth)",
+					"DELETE /admin/questions/:id":        "Delete question (requires admin auth)",
+					"PATCH  /admin/questions/:id/status": "Toggle question status (requires admin auth)",
+					"GET    /admin/questions/stats":      "Get question statistics (requires admin auth)",
+					"POST   /admin/questions/validate":   "Validate question data (requires admin auth)",
+				},
+				"questions": gin.H{
+					"GET /questions/random": "Get random questions for quiz (public)",
 				},
 			},
 			"oauth_providers": []string{"google", "facebook", "apple", "github"},

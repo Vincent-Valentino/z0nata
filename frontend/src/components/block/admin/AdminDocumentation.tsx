@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Separator } from '@/components/ui/separator'
 import { 
   Plus, 
   Search, 
@@ -16,8 +18,18 @@ import {
   Calendar,
   User,
   Folder,
-  File
+  File,
+  Loader2,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  Globe,
+  EyeOff,
+  Save,
+  X
 } from 'lucide-react'
+import { moduleService, type Module } from '@/services/moduleService'
+import { MarkdownRenderer } from '@/components/block/docs/MarkdownRenderer'
 
 interface DocModule {
   id: string
@@ -32,87 +44,154 @@ interface DocModule {
   isPublished: boolean
 }
 
+interface FormErrors {
+  title?: string
+  description?: string
+  content?: string
+  parentId?: string
+}
+
 export const AdminDocumentation = () => {
+  const [modules, setModules] = useState<Module[]>([])
+  const [loading, setLoading] = useState(true)
+  const [submitLoading, setSubmitLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [typeFilter, setTypeFilter] = useState<'all' | 'module' | 'submodule'>('all')
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [selectedType, setSelectedType] = useState<'all' | 'module' | 'submodule'>('all')
+  const [selectedStatus, setSelectedStatus] = useState<'all' | 'published' | 'draft'>('all')
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [editingDoc, setEditingDoc] = useState<DocModule | null>(null)
   const [newDoc, setNewDoc] = useState({
     title: '',
     description: '',
     content: '',
-    type: 'module' as const,
+    type: 'module' as 'module' | 'submodule',
     parentId: ''
   })
+  const [formErrors, setFormErrors] = useState<FormErrors>({})
+  const [viewingDoc, setViewingDoc] = useState<DocModule | null>(null)
+  const [showViewDialog, setShowViewDialog] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
 
-  // Mock data - replace with real API calls
-  const docs: DocModule[] = [
-    {
-      id: '1',
-      title: 'Getting Started Guide',
-      description: 'Complete guide for new users',
-      content: '# Getting Started\n\nWelcome to Zonata...',
-      type: 'module',
-      createdBy: 'admin@zonata.com',
-      createdAt: '2024-03-01',
-      updatedAt: '2024-03-15',
-      isPublished: true
-    },
-    {
-      id: '2',
-      title: 'Account Setup',
-      description: 'How to set up your account',
-      content: '## Account Setup\n\nTo create your account...',
-      type: 'submodule',
-      parentId: '1',
-      createdBy: 'admin@zonata.com',
-      createdAt: '2024-03-02',
-      updatedAt: '2024-03-10',
-      isPublished: true
-    },
-    {
-      id: '3',
-      title: 'API Documentation',
-      description: 'Complete API reference',
-      content: '# API Documentation\n\nThis document covers...',
-      type: 'module',
-      createdBy: 'admin@zonata.com',
-      createdAt: '2024-02-20',
-      updatedAt: '2024-03-14',
-      isPublished: false
+  const validateForm = (): boolean => {
+    const errors: FormErrors = {}
+
+    if (!newDoc.title.trim()) {
+      errors.title = 'Title is required'
+    } else if (newDoc.title.trim().length < 3) {
+      errors.title = 'Title must be at least 3 characters'
+    } else if (newDoc.title.trim().length > 200) {
+      errors.title = 'Title must be less than 200 characters'
     }
-  ]
 
+    if (newDoc.description.trim().length > 500) {
+      errors.description = 'Description must be less than 500 characters'
+    }
+
+    if (!newDoc.content.trim()) {
+      errors.content = 'Content is required'
+    }
+
+    if (newDoc.type === 'submodule' && !newDoc.parentId) {
+      errors.parentId = 'Parent module is required for submodules'
+    }
+
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const fetchModules = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await moduleService.getModules({ search: searchTerm, limit: 100 })
+      setModules(response.modules || [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch modules')
+      console.error('Error fetching modules:', err)
+      setModules([]) // Ensure modules is always an array, never null
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchModules()
+  }, [])
+
+  // Convert modules to DocModule format for display with proper null safety
+  const docs: DocModule[] = useMemo(() => {
+    if (!modules || !Array.isArray(modules)) {
+      return []
+    }
+
+    return (modules || []).flatMap(module => {
+      const moduleDoc: DocModule = {
+        id: module.id,
+        title: module.name,
+        description: module.description,
+        content: module.content,
+        type: 'module',
+        createdBy: module.created_by,
+        createdAt: module.created_at,
+        updatedAt: module.updated_at,
+        isPublished: module.is_published
+      }
+
+      const subModuleDocs: DocModule[] = (module.sub_modules || []).map(subModule => ({
+        id: subModule.id,
+        title: subModule.name,
+        description: subModule.description,
+        content: subModule.content,
+        type: 'submodule',
+        parentId: module.id,
+        createdBy: subModule.created_by,
+        createdAt: subModule.created_at,
+        updatedAt: subModule.updated_at,
+        isPublished: subModule.is_published
+      }))
+
+      return [moduleDoc, ...subModuleDocs]
+    })
+  }, [modules])
+
+  // Filter docs based on search and type
   const filteredDocs = docs.filter(doc => {
     const matchesSearch = doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          doc.description.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesType = typeFilter === 'all' || doc.type === typeFilter
+    const matchesType = selectedType === 'all' || doc.type === selectedType
+    const matchesStatus = selectedStatus === 'all' || 
+                         (selectedStatus === 'published' && doc.isPublished) ||
+                         (selectedStatus === 'draft' && !doc.isPublished)
     
-    return matchesSearch && matchesType
+    return matchesSearch && matchesType && matchesStatus
   })
 
-  const modules = docs.filter(doc => doc.type === 'module')
   const getSubmodules = (moduleId: string) => docs.filter(doc => doc.type === 'submodule' && doc.parentId === moduleId)
 
   const getDocTypeIcon = (type: string) => {
-    return type === 'module' ? <Folder className="h-4 w-4" /> : <File className="h-4 w-4" />
+    return type === 'module' ? <Folder className="w-4 h-4" /> : <File className="w-4 h-4" />
   }
 
   const getDocTypeBadge = (type: string) => {
     return type === 'module' ? 
-      <Badge variant="default" className="bg-blue-100 text-blue-700">Module</Badge> :
-      <Badge variant="secondary" className="bg-purple-100 text-purple-700">Submodule</Badge>
+      <Badge variant="default" className="text-xs">Module</Badge> : 
+      <Badge variant="secondary" className="text-xs">Submodule</Badge>
   }
 
   const getStatusBadge = (isPublished: boolean) => {
     return isPublished ? 
-      <Badge variant="default" className="bg-green-100 text-green-700">Published</Badge> :
-      <Badge variant="secondary" className="bg-yellow-100 text-yellow-700">Draft</Badge>
+      <Badge variant="default" className="text-xs bg-green-100 text-green-800 border-green-200">
+        <Globe className="w-3 h-3 mr-1" />
+        Published
+      </Badge> : 
+      <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 border-orange-200">
+        <EyeOff className="w-3 h-3 mr-1" />
+        Draft
+      </Badge>
   }
 
-  const handleAddDoc = () => {
-    console.log('Adding documentation:', newDoc)
-    // Implement add documentation logic
-    setIsAddDialogOpen(false)
+  const resetForm = () => {
     setNewDoc({
       title: '',
       description: '',
@@ -120,320 +199,789 @@ export const AdminDocumentation = () => {
       type: 'module',
       parentId: ''
     })
+    setFormErrors({})
+    setEditingDoc(null)
+    setViewingDoc(null)
   }
 
-  const handleDeleteDoc = (docId: string) => {
-    console.log('Deleting documentation:', docId)
-    // Implement delete logic
+  const handleAddDoc = async () => {
+    if (!validateForm()) return
+
+    try {
+      setSubmitLoading(true)
+      setError(null)
+
+      if (newDoc.type === 'module') {
+        await moduleService.createModule({
+          name: newDoc.title.trim(),
+          description: newDoc.description.trim(),
+          content: newDoc.content.trim()
+        })
+      } else {
+        await moduleService.createSubModule(newDoc.parentId, {
+          name: newDoc.title.trim(),
+          description: newDoc.description.trim(),
+          content: newDoc.content.trim()
+        })
+      }
+
+      await fetchModules()
+      setShowCreateDialog(false)
+      resetForm()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create document')
+    } finally {
+      setSubmitLoading(false)
+    }
+  }
+
+  const handleEditDoc = async () => {
+    if (!validateForm() || !editingDoc) return
+
+    // Check if user is trying to convert between types
+    const isTypeChange = editingDoc.type !== newDoc.type
+    
+    if (isTypeChange) {
+      const confirmMessage = editingDoc.type === 'module' 
+        ? 'Converting a module to a submodule will move it under another module. Are you sure?'
+        : 'Converting a submodule to a module will make it independent. Are you sure?'
+      
+      if (!confirm(confirmMessage)) {
+        return
+      }
+    }
+
+    try {
+      setSubmitLoading(true)
+      setError(null)
+
+      if (isTypeChange) {
+        // For type conversion, we need to handle it specially
+        if (newDoc.type === 'module') {
+          // Converting submodule to module - create new module and delete submodule
+          await moduleService.createModule({
+            name: newDoc.title.trim(),
+            description: newDoc.description.trim(),
+            content: newDoc.content.trim()
+          })
+          if (editingDoc.parentId) {
+            await moduleService.deleteSubModule(editingDoc.parentId, editingDoc.id)
+          }
+        } else {
+          // Converting module to submodule - create new submodule and delete module
+          if (newDoc.parentId) {
+            await moduleService.createSubModule(newDoc.parentId, {
+              name: newDoc.title.trim(),
+              description: newDoc.description.trim(),
+              content: newDoc.content.trim()
+            })
+            await moduleService.deleteModule(editingDoc.id)
+          }
+        }
+      } else {
+        // Regular update without type change
+        if (editingDoc.type === 'module') {
+          await moduleService.updateModule(editingDoc.id, {
+            name: newDoc.title.trim(),
+            description: newDoc.description.trim(),
+            content: newDoc.content.trim()
+          })
+        } else if (editingDoc.parentId) {
+          await moduleService.updateSubModule(editingDoc.parentId, editingDoc.id, {
+            name: newDoc.title.trim(),
+            description: newDoc.description.trim(),
+            content: newDoc.content.trim()
+          })
+        }
+      }
+
+      await fetchModules()
+      setShowEditDialog(false)
+      resetForm()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update document')
+    } finally {
+      setSubmitLoading(false)
+    }
+  }
+
+  const handleViewDoc = (doc: DocModule) => {
+    setViewingDoc(doc)
+    setShowViewDialog(true)
+  }
+
+  const handleStartEdit = (doc: DocModule) => {
+    setEditingDoc(doc)
+    setNewDoc({
+      title: doc.title,
+      description: doc.description,
+      content: doc.content,
+      type: doc.type,
+      parentId: doc.parentId || ''
+    })
+    setShowEditDialog(true)
+  }
+
+  const handleToggleStatus = async (doc: DocModule) => {
+    try {
+      setError(null)
+      
+      if (doc.type === 'module') {
+        await moduleService.toggleModulePublication(doc.id, !doc.isPublished)
+      } else if (doc.parentId) {
+        await moduleService.toggleSubModulePublication(doc.parentId, doc.id, !doc.isPublished)
+      }
+      
+      await fetchModules()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update publication status')
+    }
+  }
+
+  const handleDeleteDoc = async (docId: string) => {
+    if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      setError(null)
+      const doc = docs.find(d => d.id === docId)
+      
+      if (doc?.type === 'module') {
+        await moduleService.deleteModule(docId)
+      } else if (doc?.parentId) {
+        await moduleService.deleteSubModule(doc.parentId, docId)
+      }
+      
+      await fetchModules()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete document')
+    }
+  }
+
+  const handleInputChange = (field: keyof typeof newDoc, value: string) => {
+    setNewDoc(prev => ({ ...prev, [field]: value }))
+    // Clear error when user starts typing
+    if (formErrors[field as keyof FormErrors]) {
+      setFormErrors(prev => ({ ...prev, [field]: undefined }))
+    }
+  }
+
+  if (loading && (!modules || modules.length === 0)) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin" />
+        <span className="ml-2">Loading documentation...</span>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
-      {/* Header Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Documents</CardTitle>
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{docs.length}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Modules</CardTitle>
-            <Folder className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {docs.filter(d => d.type === 'module').length}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Submodules</CardTitle>
-            <File className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {docs.filter(d => d.type === 'submodule').length}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Published</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {docs.filter(d => d.isPublished).length}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Actions and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between">
-        <div className="flex gap-4 flex-1">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search documentation..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          
-          <div className="flex gap-2">
-            <Button
-              variant={typeFilter === 'all' ? 'default' : 'outline'}
-              onClick={() => setTypeFilter('all')}
-              className="gap-2"
-            >
-              All
-            </Button>
-            <Button
-              variant={typeFilter === 'module' ? 'default' : 'outline'}
-              onClick={() => setTypeFilter('module')}
-              className="gap-2"
-            >
-              <Folder className="h-4 w-4" />
-              Modules
-            </Button>
-            <Button
-              variant={typeFilter === 'submodule' ? 'default' : 'outline'}
-              onClick={() => setTypeFilter('submodule')}
-              className="gap-2"
-            >
-              <File className="h-4 w-4" />
-              Submodules
-            </Button>
-          </div>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Documentation Management</h1>
+          <p className="text-muted-foreground">Create and manage learning modules and documentation</p>
         </div>
         
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
+            <Button onClick={resetForm} className="w-full sm:w-auto">
+              <Plus className="w-4 h-4 mr-2" />
               Add Documentation
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl">
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Add New Documentation</DialogTitle>
+              <DialogTitle>Create New Documentation</DialogTitle>
               <DialogDescription>
-                Create a new module or submodule with markdown content
+                Create a new module or submodule for the learning platform
               </DialogDescription>
             </DialogHeader>
             
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Title</label>
-                  <Input
-                    placeholder="Enter documentation title..."
-                    value={newDoc.title}
-                    onChange={(e) => setNewDoc({ ...newDoc, title: e.target.value })}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Type</label>
-                  <select 
-                    value={newDoc.type} 
-                    onChange={(e) => setNewDoc({ ...newDoc, type: e.target.value as 'module' | 'submodule' })}
-                    className="w-full p-2 border rounded-md"
+            <div className="space-y-4 py-4">
+              {/* Type Selection */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Type *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant={newDoc.type === 'module' ? 'default' : 'outline'}
+                    className="justify-start"
+                    onClick={() => handleInputChange('type', 'module')}
                   >
-                    <option value="module">Module</option>
-                    <option value="submodule">Submodule</option>
-                  </select>
+                    <Folder className="w-4 h-4 mr-2" />
+                    Module
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={newDoc.type === 'submodule' ? 'default' : 'outline'}
+                    className="justify-start"
+                    onClick={() => handleInputChange('type', 'submodule')}
+                  >
+                    <File className="w-4 h-4 mr-2" />
+                    Submodule
+                  </Button>
                 </div>
               </div>
-              
+
+              {/* Parent Module Selection for Submodules */}
               {newDoc.type === 'submodule' && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Parent Module</label>
-                  <select 
-                    value={newDoc.parentId} 
-                    onChange={(e) => setNewDoc({ ...newDoc, parentId: e.target.value })}
-                    className="w-full p-2 border rounded-md"
+                  <label className="text-sm font-medium">Parent Module *</label>
+                  <select
+                    value={newDoc.parentId}
+                    onChange={(e) => handleInputChange('parentId', e.target.value)}
+                    className="w-full px-3 py-2 border border-input bg-background rounded-md"
                   >
-                    <option value="">Select parent module...</option>
-                    {modules.map((module) => (
-                      <option key={module.id} value={module.id}>{module.title}</option>
+                    <option value="">Select a parent module</option>
+                    {modules.filter(m => m.is_published).map(module => (
+                      <option key={module.id} value={module.id}>
+                        {module.name}
+                      </option>
                     ))}
                   </select>
+                  {formErrors.parentId && (
+                    <p className="text-sm text-red-600">{formErrors.parentId}</p>
+                  )}
                 </div>
               )}
-              
+
+              {/* Title */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Description</label>
+                <label className="text-sm font-medium">
+                  Title * <span className="text-muted-foreground">({newDoc.title.length}/200)</span>
+                </label>
                 <Input
-                  placeholder="Brief description of the documentation..."
-                  value={newDoc.description}
-                  onChange={(e) => setNewDoc({ ...newDoc, description: e.target.value })}
+                  value={newDoc.title}
+                  onChange={(e) => handleInputChange('title', e.target.value)}
+                  placeholder="Enter title..."
+                  maxLength={200}
                 />
+                {formErrors.title && (
+                  <p className="text-sm text-red-600">{formErrors.title}</p>
+                )}
               </div>
-              
+
+              {/* Description */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Content (Markdown)</label>
+                <label className="text-sm font-medium">
+                  Description <span className="text-muted-foreground">({newDoc.description.length}/500)</span>
+                </label>
                 <Textarea
-                  placeholder="Write your markdown content here..."
-                  value={newDoc.content}
-                  onChange={(e) => setNewDoc({ ...newDoc, content: e.target.value })}
-                  className="h-64 font-mono"
+                  value={newDoc.description}
+                  onChange={(e) => handleInputChange('description', e.target.value)}
+                  placeholder="Enter description..."
+                  rows={3}
+                  maxLength={500}
                 />
-                <p className="text-xs text-muted-foreground">
-                  You can use standard Markdown syntax including headers, lists, links, and code blocks.
-                </p>
+                {formErrors.description && (
+                  <p className="text-sm text-red-600">{formErrors.description}</p>
+                )}
               </div>
-              
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleAddDoc}>
-                  Add Documentation
-                </Button>
+
+              {/* Content */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Content (Markdown) * <span className="text-muted-foreground">({newDoc.content.length} characters)</span>
+                </label>
+                <Textarea
+                  value={newDoc.content}
+                  onChange={(e) => handleInputChange('content', e.target.value)}
+                  placeholder="Enter content in markdown format..."
+                  rows={8}
+                  className="font-mono text-sm"
+                />
+                {formErrors.content && (
+                  <p className="text-sm text-red-600">{formErrors.content}</p>
+                )}
               </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowCreateDialog(false)
+                  resetForm()
+                }}
+                disabled={submitLoading}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleAddDoc} disabled={submitLoading}>
+                {submitLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create
+                  </>
+                )}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Documentation Structure View */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Hierarchical View */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5" />
-              Documentation Structure
-            </CardTitle>
-            <CardDescription>Organized by modules and submodules</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {modules.map((module) => (
-                <div key={module.id} className="space-y-2">
-                  <div className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Folder className="h-4 w-4 text-blue-600" />
-                      <div>
-                        <h4 className="font-medium">{module.title}</h4>
-                        <p className="text-sm text-muted-foreground">{module.description}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {getStatusBadge(module.isPublished)}
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  {/* Submodules */}
-                  <div className="ml-6 space-y-2">
-                    {getSubmodules(module.id).map((submodule) => (
-                      <div key={submodule.id} className="flex items-center justify-between p-2 border rounded bg-muted/30">
-                        <div className="flex items-center gap-3">
-                          <File className="h-3 w-3 text-purple-600" />
-                          <div>
-                            <h5 className="text-sm font-medium">{submodule.title}</h5>
-                            <p className="text-xs text-muted-foreground">{submodule.description}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {getStatusBadge(submodule.isPublished)}
-                          <Button variant="ghost" size="sm">
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+      {/* View Dialog */}
+      <Dialog open={showViewDialog} onOpenChange={(open) => {
+        setShowViewDialog(open)
+        if (!open) {
+          setViewingDoc(null)
+        }
+      }}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {viewingDoc?.type === 'module' ? (
+                <Folder className="w-5 h-5" />
+              ) : (
+                <File className="w-5 h-5" />
+              )}
+              {viewingDoc?.title}
+            </DialogTitle>
+            <DialogDescription>
+              {viewingDoc?.description}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto">
+            {viewingDoc && (
+              <MarkdownRenderer 
+                content={viewingDoc.content} 
+                className="prose prose-sm dark:prose-invert max-w-none"
+              />
+            )}
+          </div>
 
-        {/* List View */}
-        <Card>
-          <CardHeader>
-            <CardTitle>All Documents ({filteredDocs.length})</CardTitle>
-            <CardDescription>Complete list of documentation</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {filteredDocs.map((doc) => (
-                <div key={doc.id} className="border rounded-lg p-4 space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-2">
-                        {getDocTypeIcon(doc.type)}
-                        <h3 className="font-medium">{doc.title}</h3>
-                      </div>
-                      
-                      <p className="text-sm text-muted-foreground">{doc.description}</p>
-                      
-                      <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex justify-between items-center pt-4 border-t">
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <User className="w-3 h-3" />
+                {viewingDoc?.createdBy}
+              </div>
+              <div className="flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                {viewingDoc && new Date(viewingDoc.createdAt).toLocaleDateString()}
+              </div>
+              {viewingDoc && getStatusBadge(viewingDoc.isPublished)}
+            </div>
+            
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => viewingDoc && handleStartEdit(viewingDoc)}
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Edit
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowViewDialog(false)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={(open) => {
+        setShowEditDialog(open)
+        if (!open) {
+          setError(null)
+          resetForm()
+        }
+      }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Documentation</DialogTitle>
+            <DialogDescription>
+              Make changes to the {editingDoc?.type} content and settings
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* Type and Parent Module Display */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Type</label>
+              <div className="flex items-center gap-2">
+                {newDoc.type === 'module' ? (
+                  <Folder className="w-4 h-4" />
+                ) : (
+                  <File className="w-4 h-4" />
+                )}
+                <span className="text-sm">
+                  {newDoc.type === 'module' ? 'Module' : 'Submodule'}
+                </span>
+                {newDoc.type === 'submodule' && newDoc.parentId && (
+                  <span className="text-sm text-muted-foreground">
+                    → {modules.find(m => m.id === newDoc.parentId)?.name}
+                  </span>
+                )}
+              </div>
+            </div>
+
+                         {/* Option to change parent or convert type */}
+             <div className="space-y-2">
+               <label className="text-sm font-medium">Change Type or Parent</label>
+               {editingDoc && editingDoc.type !== newDoc.type && (
+                 <Alert>
+                   <AlertCircle className="h-4 w-4" />
+                   <AlertDescription>
+                     Warning: Converting between module types will recreate the item with a new ID.
+                   </AlertDescription>
+                 </Alert>
+               )}
+               <div className="grid grid-cols-2 gap-2">
+                 <Button
+                   type="button"
+                   variant={newDoc.type === 'module' ? 'default' : 'outline'}
+                   className="justify-start"
+                   onClick={() => handleInputChange('type', 'module')}
+                 >
+                   <Folder className="w-4 h-4 mr-2" />
+                   Module
+                 </Button>
+                 <Button
+                   type="button"
+                   variant={newDoc.type === 'submodule' ? 'default' : 'outline'}
+                   className="justify-start"
+                   onClick={() => handleInputChange('type', 'submodule')}
+                 >
+                   <File className="w-4 h-4 mr-2" />
+                   Submodule
+                 </Button>
+               </div>
+             </div>
+
+            {/* Parent Module Selection for Submodules */}
+            {newDoc.type === 'submodule' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Parent Module *</label>
+                <select
+                  value={newDoc.parentId}
+                  onChange={(e) => handleInputChange('parentId', e.target.value)}
+                  className="w-full px-3 py-2 border border-input bg-background rounded-md"
+                >
+                  <option value="">Select a parent module</option>
+                  {modules.filter(m => m.is_published && m.id !== editingDoc?.id).map(module => (
+                    <option key={module.id} value={module.id}>
+                      {module.name}
+                    </option>
+                  ))}
+                </select>
+                {formErrors.parentId && (
+                  <p className="text-sm text-red-600">{formErrors.parentId}</p>
+                )}
+              </div>
+            )}
+
+            {/* Title */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Title * <span className="text-muted-foreground">({newDoc.title.length}/200)</span>
+              </label>
+              <Input
+                value={newDoc.title}
+                onChange={(e) => handleInputChange('title', e.target.value)}
+                placeholder="Enter title..."
+                maxLength={200}
+              />
+              {formErrors.title && (
+                <p className="text-sm text-red-600">{formErrors.title}</p>
+              )}
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Description <span className="text-muted-foreground">({newDoc.description.length}/500)</span>
+              </label>
+              <Textarea
+                value={newDoc.description}
+                onChange={(e) => handleInputChange('description', e.target.value)}
+                placeholder="Enter description..."
+                rows={3}
+                maxLength={500}
+              />
+              {formErrors.description && (
+                <p className="text-sm text-red-600">{formErrors.description}</p>
+              )}
+            </div>
+
+            {/* Content */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Content (Markdown) * <span className="text-muted-foreground">({newDoc.content.length} characters)</span>
+              </label>
+              <Textarea
+                value={newDoc.content}
+                onChange={(e) => handleInputChange('content', e.target.value)}
+                placeholder="Enter content in markdown format..."
+                rows={8}
+                className="font-mono text-sm"
+              />
+              {formErrors.content && (
+                <p className="text-sm text-red-600">{formErrors.content}</p>
+              )}
+            </div>
+
+            {/* Publication Status */}
+            {editingDoc && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Publication Status</label>
+                <div className="flex items-center gap-2">
+                  {getStatusBadge(editingDoc.isPublished)}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleToggleStatus(editingDoc)}
+                  >
+                    {editingDoc.isPublished ? 'Unpublish' : 'Publish'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowEditDialog(false)
+                resetForm()
+              }}
+              disabled={submitLoading}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleEditDoc} disabled={submitLoading}>
+              {submitLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Changes
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Filters */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+          <Input
+            placeholder="Search documentation..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        
+        <select
+          value={selectedType}
+          onChange={(e) => setSelectedType(e.target.value as 'all' | 'module' | 'submodule')}
+          className="px-3 py-2 border border-input bg-background rounded-md"
+        >
+          <option value="all">All Types</option>
+          <option value="module">Modules Only</option>
+          <option value="submodule">Submodules Only</option>
+        </select>
+
+        <select
+          value={selectedStatus}
+          onChange={(e) => setSelectedStatus(e.target.value as 'all' | 'published' | 'draft')}
+          className="px-3 py-2 border border-input bg-background rounded-md"
+        >
+          <option value="all">All Status</option>
+          <option value="published">Published</option>
+          <option value="draft">Draft</option>
+        </select>
+
+        <Button variant="outline" onClick={fetchModules} disabled={loading}>
+          {loading ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <Search className="w-4 h-4 mr-2" />
+          )}
+          Refresh
+        </Button>
+      </div>
+
+      {/* Documentation List */}
+      <div className="grid gap-4">
+        {filteredDocs.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-8">
+              <BookOpen className="w-12 h-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">No documentation found</h3>
+              <p className="text-muted-foreground text-center">
+                {docs.length === 0 
+                  ? "Get started by creating your first module or submodule"
+                  : "Try adjusting your search or filter criteria"
+                }
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          filteredDocs.map((doc) => (
+            <Card key={doc.id} className="hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    {getDocTypeIcon(doc.type)}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <CardTitle className="text-lg truncate">{doc.title}</CardTitle>
                         {getDocTypeBadge(doc.type)}
                         {getStatusBadge(doc.isPublished)}
                       </div>
-                      
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          {doc.createdBy}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          Updated {doc.updatedAt}
-                        </span>
-                      </div>
-                      
-                      <div className="text-xs text-muted-foreground bg-muted p-2 rounded font-mono">
-                        {doc.content.substring(0, 100)}...
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => handleDeleteDoc(doc.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <CardDescription className="line-clamp-2">
+                        {doc.description || 'No description available'}
+                      </CardDescription>
                     </div>
                   </div>
+                  
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleToggleStatus(doc)}
+                      title={doc.isPublished ? 'Unpublish' : 'Publish'}
+                    >
+                      {doc.isPublished ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Globe className="w-4 h-4" />
+                      )}
+                    </Button>
+                    
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleViewDoc(doc)}
+                      title="View"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                    
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => handleStartEdit(doc)}
+                      title="Edit"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => handleDeleteDoc(doc.id)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
-              ))}
+              </CardHeader>
               
-              {filteredDocs.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No documentation found matching your criteria</p>
+              <CardContent className="pt-0">
+                <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+                  <div className="flex items-center gap-1">
+                    <User className="w-3 h-3" />
+                    {doc.createdBy}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    {new Date(doc.createdAt).toLocaleDateString()}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    Updated {new Date(doc.updatedAt).toLocaleDateString()}
+                  </div>
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                
+                {doc.type === 'module' && (
+                  <div className="mt-3">
+                    {getSubmodules(doc.id).length > 0 ? (
+                      <div className="text-sm text-muted-foreground">
+                        <FileText className="w-3 h-3 inline mr-1" />
+                        {getSubmodules(doc.id).length} submodule(s)
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">
+                        No submodules
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {doc.type === 'submodule' && doc.parentId && (
+                  <div className="mt-3">
+                    <div className="text-sm text-muted-foreground">
+                      <Folder className="w-3 h-3 inline mr-1" />
+                      Parent: {modules.find(m => m.id === doc.parentId)?.name || 'Unknown'}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
+
+      {/* Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Summary</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <div className="font-medium">{docs.filter(d => d.type === 'module').length}</div>
+              <div className="text-muted-foreground">Modules</div>
+            </div>
+            <div>
+              <div className="font-medium">{docs.filter(d => d.type === 'submodule').length}</div>
+              <div className="text-muted-foreground">Submodules</div>
+            </div>
+            <div>
+              <div className="font-medium">{docs.filter(d => d.isPublished).length}</div>
+              <div className="text-muted-foreground">Published</div>
+            </div>
+            <div>
+              <div className="font-medium">{docs.filter(d => !d.isPublished).length}</div>
+              <div className="text-muted-foreground">Drafts</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 } 

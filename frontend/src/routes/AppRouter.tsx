@@ -5,6 +5,8 @@ import { MockTestPage } from '@/pages/tests/MockTestPage'
 import { TimeQuizPage } from '@/pages/tests/TimeQuizPage'
 import { AuthPage } from '@/pages/auth/AuthPage'
 import { AdminPage } from '@/pages/admin/AdminPage'
+import { ProfilePage } from '@/pages/profile/ProfilePage'
+import { ResultsPage } from '@/pages/results/ResultsPage'
 
 export const AppRouter = () => {
   return (
@@ -22,6 +24,10 @@ export const AppRouter = () => {
         
         {/* Auth Routes */}
         <Route path="/login" element={<AuthPage />} />
+        
+        {/* User Routes */}
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/results" element={<ResultsPage />} />
         
         {/* Admin Routes */}
         <Route path="/admin" element={<AdminPage />} />

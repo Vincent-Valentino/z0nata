@@ -11,7 +11,8 @@ type Module struct {
 	Name        string             `json:"name" bson:"name" binding:"required,min=1,max=200"`
 	Description string             `json:"description" bson:"description" binding:"max=500"`
 	SubModules  []SubModule        `json:"sub_modules" bson:"sub_modules"`
-	Content     string             `json:"content" bson:"content"` // Markdown content
+	Content     string             `json:"content" bson:"content"`           // Markdown content
+	IsPublished bool               `json:"is_published" bson:"is_published"` // Publication status
 
 	// Metadata
 	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
@@ -24,7 +25,8 @@ type SubModule struct {
 	ID          primitive.ObjectID `json:"id" bson:"_id,omitempty"`
 	Name        string             `json:"name" bson:"name" binding:"required,min=1,max=200"`
 	Description string             `json:"description" bson:"description" binding:"max=500"`
-	Content     string             `json:"content" bson:"content"` // Markdown content
+	Content     string             `json:"content" bson:"content"`           // Markdown content
+	IsPublished bool               `json:"is_published" bson:"is_published"` // Publication status
 
 	// Metadata
 	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
@@ -52,4 +54,20 @@ type CreateSubModuleRequest struct {
 	Name        string `json:"name" binding:"required,min=1,max=200"`
 	Description string `json:"description" binding:"max=500"`
 	Content     string `json:"content" binding:"required"`
+}
+
+// Additional request/response models for API
+type GetModulesRequest struct {
+	Page      int    `json:"page"`
+	Limit     int    `json:"limit"`
+	Search    string `json:"search,omitempty"`
+	Published *bool  `json:"published,omitempty"`
+}
+
+type GetModulesResponse struct {
+	Modules    []Module `json:"modules"`
+	Total      int64    `json:"total"`
+	Page       int      `json:"page"`
+	Limit      int      `json:"limit"`
+	TotalPages int      `json:"total_pages"`
 }

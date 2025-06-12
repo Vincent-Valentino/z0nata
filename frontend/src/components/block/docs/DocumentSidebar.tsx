@@ -1,10 +1,9 @@
 import { useState, useMemo } from 'react'
-import { Search, Book, FileText, GraduationCap, ChevronRight, Hash } from 'lucide-react'
+import { Search, Book, FileText, GraduationCap, ChevronRight, Hash, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 
 interface DocSection {
   id: string
@@ -64,18 +63,28 @@ export const DocumentSidebar = ({
   }
 
   return (
-    <div className="h-full flex flex-col bg-background border-r border-border">
+    <div className="h-full flex flex-col bg-background border-r border-border pt-5">
       {/* Search */}
       <div className="p-4 border-b border-border bg-background/50 backdrop-blur-sm">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+        <div className="relative group">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4 transition-colors group-focus-within:text-primary" />
           <Input
             type="text"
-            placeholder="Search documentation..."
+            placeholder="Filter sections..."
             value={searchValue}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-10 bg-background/70 border-border/50 text-foreground placeholder:text-muted-foreground focus:bg-background focus:border-primary"
+            className="pl-10 bg-background/70 border-border/50 text-foreground placeholder:text-muted-foreground focus:bg-background focus:border-primary shadow-sm hover:shadow-md transition-all duration-200 focus:shadow-lg"
           />
+          {searchValue && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-muted rounded-full"
+              onClick={() => onSearchChange('')}
+            >
+              <X className="w-3 h-3" />
+            </Button>
+          )}
         </div>
       </div>
 

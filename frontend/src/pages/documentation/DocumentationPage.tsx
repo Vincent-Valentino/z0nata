@@ -5,35 +5,92 @@ import {
   MarkdownRenderer, 
   DocumentSidebar, 
   DocumentNavbar, 
+  SearchDialog,
   getDefaultDocSections 
 } from '@/components/block/docs'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { moduleService, type Module } from '@/services/moduleService'
 
-// Import markdown content
-import introductionMd from '@/content/docs/introduction.md?raw'
-import huaweiAiMd from '@/content/docs/huawei-ai.md?raw'
-import hciaCertificationMd from '@/content/docs/hcia-certification.md?raw'
+// Use the existing interfaces from DocumentSidebar
+interface DocSection {
+  id: string
+  title: string
+  icon: React.ReactNode
+  description: string
+  items?: DocItem[]
+}
 
-interface MarkdownContent {
-  [key: string]: string
+interface DocItem {
+  id: string
+  title: string
+  level: number
 }
 
 const DocumentationContent = () => {
   const { resolvedTheme } = useTheme()
-  const [activeSection, setActiveSection] = useState('introduction')
+  const [activeSection, setActiveSection] = useState('')
   const [activeItem, setActiveItem] = useState<string>()
   const [searchValue, setSearchValue] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [recentSearches, setRecentSearches] = useState<string[]>([])
+  const [modules, setModules] = useState<Module[]>([])
+  const [sections, setSections] = useState<DocSection[]>([])
+  const [error, setError] = useState<string | null>(null)
 
-  const sections = getDefaultDocSections()
+  // Load recent searches from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('doc-recent-searches')
+    if (saved) {
+      try {
+        setRecentSearches(JSON.parse(saved))
+      } catch (e) {
+        console.error('Failed to parse recent searches:', e)
+      }
+    }
+  }, [])
 
-  // Markdown content mapping
-  const markdownContent: MarkdownContent = {
-    'introduction': introductionMd,
-    'huawei-ai': huaweiAiMd,
-    'hcia-certification': hciaCertificationMd
+  // Fetch published modules on component mount
+  useEffect(() => {
+    fetchPublishedModules()
+  }, [])
+
+  const fetchPublishedModules = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      const response = await moduleService.getModules({ published: true, limit: 100 })
+      setModules(response.modules || [])
+      
+      // Convert modules to sections format
+      const docSections: DocSection[] = (response.modules || []).map(module => ({
+        id: module.id,
+        title: module.name,
+        description: module.description,
+        icon: <div>📚</div>, // You can customize icons based on module content
+        items: (module.sub_modules || []).filter(sub => sub.is_published).map(subModule => ({
+          id: subModule.id,
+          title: subModule.name,
+          level: 1 // All submodules are level 1 for now
+        }))
+      }))
+      
+      setSections(docSections)
+      
+      // Set first module as active if none selected
+      if (!activeSection && docSections.length > 0) {
+        setActiveSection(docSections[0].id)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch documentation')
+      console.error('Error fetching documentation:', err)
+      setModules([]) // Ensure modules is always an array, never null
+      setSections([]) // Clear sections on error
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   // Simulate loading
@@ -46,8 +103,27 @@ const DocumentationContent = () => {
 
   // Get current content
   const currentContent = useMemo(() => {
-    return markdownContent[activeSection] || '# Content not found\n\nThe requested content could not be loaded.'
-  }, [activeSection, markdownContent])
+    if (!modules || !Array.isArray(modules)) {
+      return '# Content not found\n\nThe requested content could not be loaded.'
+    }
+    
+    const activeModule = modules.find(m => m.id === activeSection)
+    if (activeModule) {
+      return activeModule.content || '# No content available\n\nThis module does not have content yet.'
+    }
+    
+    // Check if it's a submodule
+    for (const module of modules) {
+      if (module.sub_modules && Array.isArray(module.sub_modules)) {
+        const subModule = module.sub_modules.find(sub => sub.id === activeSection)
+        if (subModule) {
+          return subModule.content || '# No content available\n\nThis submodule does not have content yet.'
+        }
+      }
+    }
+    
+    return '# Content not found\n\nThe requested content could not be loaded.'
+  }, [activeSection, modules])
 
   // Handle section change
   const handleSectionChange = (sectionId: string) => {
@@ -73,14 +149,39 @@ const DocumentationContent = () => {
     }, 100)
   }
 
+  // Handle search navigation
+  const handleSearchNavigate = (sectionId: string, itemId?: string) => {
+    handleSectionChange(sectionId)
+    if (itemId) {
+      // Small delay to ensure content is loaded before scrolling
+      setTimeout(() => {
+        handleItemClick(itemId)
+      }, 200)
+    }
+  }
+
+  // Handle recent search
+  const handleRecentSearch = (query: string) => {
+    const updatedSearches = [query, ...recentSearches.filter(s => s !== query)].slice(0, 10)
+    setRecentSearches(updatedSearches)
+    localStorage.setItem('doc-recent-searches', JSON.stringify(updatedSearches))
+  }
+
   // Initialize from URL
   useEffect(() => {
+    if (!modules || !Array.isArray(modules) || modules.length === 0) {
+      return
+    }
+    
     const url = new URL(window.location.href)
     const sectionParam = url.searchParams.get('section')
-    if (sectionParam && markdownContent[sectionParam]) {
+    if (sectionParam && modules.some(m => 
+      m.id === sectionParam || 
+      (m.sub_modules && Array.isArray(m.sub_modules) && m.sub_modules.some(sub => sub.id === sectionParam))
+    )) {
       setActiveSection(sectionParam)
     }
-  }, [])
+  }, [modules])
 
   // Get navigation info
   const currentSectionIndex = sections.findIndex(s => s.id === activeSection)
@@ -109,7 +210,7 @@ const DocumentationContent = () => {
       "bg-background"
     )}>
       {/* Navigation */}
-      <DocumentNavbar />
+      <DocumentNavbar onSearchOpen={() => setIsSearchOpen(true)} />
       
       {/* Main Layout */}
       <div className="pt-16 flex">
@@ -199,6 +300,16 @@ const DocumentationContent = () => {
           </div>
         </main>
       </div>
+
+      {/* Search Dialog */}
+      <SearchDialog
+        open={isSearchOpen}
+        onOpenChange={setIsSearchOpen}
+        sections={sections}
+        onNavigate={handleSearchNavigate}
+        recentSearches={recentSearches}
+        onRecentSearch={handleRecentSearch}
+      />
     </div>
   )
 }

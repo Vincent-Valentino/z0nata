@@ -39,6 +39,13 @@ type UserRepository interface {
 	UpdateLastLogin(ctx context.Context, id primitive.ObjectID) error
 	Delete(ctx context.Context, id primitive.ObjectID) error
 	List(ctx context.Context, filter bson.M, page, limit int) ([]*models.User, int64, error)
+
+	// New user management methods
+	ListUsers(ctx context.Context, req *models.ListUsersRequest) (*models.ListUsersResponse, error)
+	UpdateUserStatus(ctx context.Context, id primitive.ObjectID, status models.UserStatus) error
+	GetUserStats(ctx context.Context) (*models.UserStatsResponse, error)
+	GetRecentRegistrations(ctx context.Context, days int) (int64, error)
+	SearchUsers(ctx context.Context, query string, userType models.UserType, status models.UserStatus, page, limit int) ([]*models.UserSummary, int64, error)
 }
 
 type userRepository struct {
@@ -370,4 +377,261 @@ func (r *userRepository) List(ctx context.Context, filter bson.M, page, limit in
 	}
 
 	return users, count, nil
+}
+
+// New user management methods
+
+func (r *userRepository) ListUsers(ctx context.Context, req *models.ListUsersRequest) (*models.ListUsersResponse, error) {
+	// Set defaults
+	page := 1
+	limit := 20
+	if req.Page > 0 {
+		page = req.Page
+	}
+	if req.Limit > 0 {
+		limit = req.Limit
+	}
+
+	// Build filter for search across all collections
+	filter := bson.M{}
+
+	// Search filter
+	if req.Search != "" {
+		filter["$or"] = []bson.M{
+			{"full_name": bson.M{"$regex": req.Search, "$options": "i"}},
+			{"email": bson.M{"$regex": req.Search, "$options": "i"}},
+		}
+	}
+
+	// User type filter
+	if req.UserType != "" {
+		filter["user_type"] = req.UserType
+	}
+
+	// Status filter
+	if req.Status != "" {
+		filter["status"] = req.Status
+	}
+
+	skip := (page - 1) * limit
+	opts := options.Find().
+		SetSkip(int64(skip)).
+		SetLimit(int64(limit)).
+		SetSort(bson.M{"created_at": -1})
+
+	var allUsers []models.UserSummary
+	totalCount := int64(0)
+
+	// Search in all user collections
+	collections := []struct {
+		coll     *mongo.Collection
+		userType models.UserType
+	}{
+		{r.userCollection, ""}, // General users
+		{r.mahasiswaCollection, models.UserTypeMahasiswa},
+		{r.adminCollection, models.UserTypeAdmin},
+	}
+
+	for _, c := range collections {
+		// Apply user type filter for specific collections
+		collectionFilter := filter
+		if c.userType != "" && req.UserType == "" {
+			// If no specific user type requested, include collection's default type
+			collectionFilter = bson.M{}
+			for k, v := range filter {
+				collectionFilter[k] = v
+			}
+		} else if req.UserType != "" && c.userType != "" && req.UserType != c.userType {
+			// Skip this collection if it doesn't match the requested user type
+			continue
+		}
+
+		cursor, err := c.coll.Find(ctx, collectionFilter, opts)
+		if err != nil {
+			continue // Skip this collection on error
+		}
+
+		var users []models.UserSummary
+		if c.userType == models.UserTypeMahasiswa {
+			var mahasiswaUsers []models.UserMahasiswa
+			if err := cursor.All(ctx, &mahasiswaUsers); err == nil {
+				for _, u := range mahasiswaUsers {
+					users = append(users, models.UserSummary{
+						ID:            u.ID,
+						FullName:      u.FullName,
+						Email:         u.Email,
+						UserType:      models.UserTypeMahasiswa,
+						Status:        models.UserStatus(u.Status),
+						EmailVerified: u.EmailVerified,
+						LastLogin:     u.LastLogin,
+						CreatedAt:     u.CreatedAt,
+						NIM:           u.NIM,
+						Faculty:       u.Faculty,
+						Major:         u.Major,
+					})
+				}
+			}
+		} else if c.userType == models.UserTypeAdmin {
+			var adminUsers []models.Admin
+			if err := cursor.All(ctx, &adminUsers); err == nil {
+				for _, u := range adminUsers {
+					users = append(users, models.UserSummary{
+						ID:            u.ID,
+						FullName:      u.FullName,
+						Email:         u.Email,
+						UserType:      models.UserTypeAdmin,
+						Status:        u.Status,
+						EmailVerified: u.EmailVerified,
+						LastLogin:     u.LastLogin,
+						CreatedAt:     u.CreatedAt,
+					})
+				}
+			}
+		} else {
+			var generalUsers []models.User
+			if err := cursor.All(ctx, &generalUsers); err == nil {
+				for _, u := range generalUsers {
+					users = append(users, models.UserSummary{
+						ID:            u.ID,
+						FullName:      u.FullName,
+						Email:         u.Email,
+						UserType:      u.UserType,
+						Status:        u.Status,
+						EmailVerified: u.EmailVerified,
+						LastLogin:     u.LastLogin,
+						CreatedAt:     u.CreatedAt,
+					})
+				}
+			}
+		}
+
+		cursor.Close(ctx)
+		allUsers = append(allUsers, users...)
+
+		// Count documents in this collection
+		count, err := c.coll.CountDocuments(ctx, collectionFilter)
+		if err == nil {
+			totalCount += count
+		}
+	}
+
+	totalPages := int(totalCount)/limit + 1
+	if int(totalCount)%limit == 0 && totalCount > 0 {
+		totalPages = int(totalCount) / limit
+	}
+
+	return &models.ListUsersResponse{
+		Users:      allUsers,
+		Total:      totalCount,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
+	}, nil
+}
+
+func (r *userRepository) UpdateUserStatus(ctx context.Context, id primitive.ObjectID, status models.UserStatus) error {
+	updates := bson.M{
+		"status":     status,
+		"updated_at": time.Now(),
+	}
+	return r.Update(ctx, id, updates)
+}
+
+func (r *userRepository) GetUserStats(ctx context.Context) (*models.UserStatsResponse, error) {
+	stats := &models.UserStatsResponse{
+		ByType:   make(map[string]int64),
+		ByStatus: make(map[string]int64),
+	}
+
+	// Count users by type and status across all collections
+	collections := []struct {
+		coll     *mongo.Collection
+		userType string
+	}{
+		{r.userCollection, "general"},
+		{r.mahasiswaCollection, "mahasiswa"},
+		{r.adminCollection, "admin"},
+	}
+
+	for _, c := range collections {
+		total, _ := c.coll.CountDocuments(ctx, bson.M{})
+		stats.TotalUsers += total
+		stats.ByType[c.userType] = total
+
+		// Count by status
+		statuses := []models.UserStatus{
+			models.UserStatusActive,
+			models.UserStatusPending,
+			models.UserStatusSuspended,
+			models.UserStatusRejected,
+		}
+
+		for _, status := range statuses {
+			count, _ := c.coll.CountDocuments(ctx, bson.M{"status": status})
+			stats.ByStatus[string(status)] += count
+
+			switch status {
+			case models.UserStatusActive:
+				stats.ActiveUsers += count
+			case models.UserStatusPending:
+				stats.PendingUsers += count
+			case models.UserStatusSuspended:
+				stats.SuspendedUsers += count
+			}
+		}
+	}
+
+	// Get recent registrations (last 7 days)
+	weekAgo := time.Now().AddDate(0, 0, -7)
+	recentFilter := bson.M{"created_at": bson.M{"$gte": weekAgo}}
+
+	for _, c := range collections {
+		count, _ := c.coll.CountDocuments(ctx, recentFilter)
+		stats.RecentRegistrations += count
+	}
+
+	// Pending requests count (assuming this is handled separately in access requests)
+	stats.PendingRequests = stats.PendingUsers
+
+	return stats, nil
+}
+
+func (r *userRepository) GetRecentRegistrations(ctx context.Context, days int) (int64, error) {
+	since := time.Now().AddDate(0, 0, -days)
+	filter := bson.M{"created_at": bson.M{"$gte": since}}
+
+	var total int64
+	collections := []*mongo.Collection{r.userCollection, r.mahasiswaCollection, r.adminCollection}
+
+	for _, collection := range collections {
+		count, err := collection.CountDocuments(ctx, filter)
+		if err == nil {
+			total += count
+		}
+	}
+
+	return total, nil
+}
+
+func (r *userRepository) SearchUsers(ctx context.Context, query string, userType models.UserType, status models.UserStatus, page, limit int) ([]*models.UserSummary, int64, error) {
+	req := &models.ListUsersRequest{
+		Page:     page,
+		Limit:    limit,
+		Search:   query,
+		UserType: userType,
+		Status:   status,
+	}
+
+	response, err := r.ListUsers(ctx, req)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Convert to pointer slice
+	users := make([]*models.UserSummary, len(response.Users))
+	for i := range response.Users {
+		users[i] = &response.Users[i]
+	}
+
+	return users, response.Total, nil
 }

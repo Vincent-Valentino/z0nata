@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Moon, Sun, Monitor, Menu, X, Search, BookOpen } from 'lucide-react'
+import { Moon, Sun, Monitor, Menu, X, Search } from 'lucide-react'
 import { useTheme } from '@/components/ThemeProvider'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -10,7 +10,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 
 interface DocumentNavbarProps {
@@ -50,30 +49,24 @@ export const DocumentNavbar = ({ onSearchOpen }: DocumentNavbarProps) => {
         isScrolled && "shadow-sm bg-background/98 border-border"
       )}
     >
-      <div className="container mx-auto max-w-7xl px-4">
-        <div className="flex items-center justify-between h-16">
+      <div className="container mx-auto px-2">
+        <div className="flex items-center justify-between h-20">
           {/* Logo and Title */}
           <div className="flex items-center gap-4">
             <Link
               to="/"
               className="flex items-center gap-3 text-foreground hover:text-primary transition-colors group"
             >
-              <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
-                <BookOpen className="w-5 h-5 text-white" />
+              <div className="w-11 h-11 bg-gradient-to-br from-gray-900 via-gray-800 to-black rounded-2xl flex items-center justify-center shadow-lg border border-gray-700/50 group-hover:shadow-xl transition-all duration-200">
+                <span className="text-white font-bold text-xl font-roboto-condensed tracking-tight">Z</span>
               </div>
               <div className="hidden sm:block">
-                <div className="font-bold text-lg text-foreground">QuizApp</div>
+                <div className="font-bold text-xl text-foreground font-roboto-condensed tracking-wide">z0nata</div>
                 <div className="text-xs text-muted-foreground -mt-1">
                   AI Documentation
                 </div>
               </div>
             </Link>
-
-            {/* Breadcrumb */}
-            <div className="hidden md:flex items-center text-sm text-muted-foreground">
-              <Separator orientation="vertical" className="h-4 mx-2 bg-border" />
-              <span className="text-muted-foreground">Dokumentasi</span>
-            </div>
           </div>
 
           {/* Desktop Navigation */}
@@ -83,11 +76,11 @@ export const DocumentNavbar = ({ onSearchOpen }: DocumentNavbarProps) => {
               variant="outline"
               size="sm"
               onClick={onSearchOpen}
-              className="relative justify-start text-sm text-muted-foreground hover:text-foreground bg-background/50 border-border/50 hover:bg-muted/50 hover:border-border transition-all"
+              className="relative justify-start text-sm min-w-[170px] px-4 text-muted-foreground hover:text-foreground bg-background/50 border-border/50 hover:bg-muted/50 hover:border-border transition-all shadow-sm hover:shadow-md"
             >
-              <Search className="w-4 h-4 mr-2" />
-              <span className="hidden lg:inline-flex">Search docs...</span>
-              <kbd className="pointer-events-none absolute right-1.5 top-1.5 hidden h-5 select-none items-center gap-1 rounded border border-border/50 bg-muted/70 px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 lg:flex">
+              <Search className="w-4 h-4 mr-2 flex-shrink-0" />
+              <span className="hidden lg:inline-flex flex-1 text-left">Search...</span>
+              <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 hidden h-5 select-none items-center gap-0.5 rounded border border-border/50 bg-muted/70 px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 lg:flex">
                 <span className="text-xs">⌘</span>K
               </kbd>
             </Button>
@@ -176,14 +169,14 @@ export const DocumentNavbar = ({ onSearchOpen }: DocumentNavbarProps) => {
               {/* Mobile Search */}
               <Button
                 variant="outline"
-                className="w-full justify-start bg-background/50 border-border/50 text-foreground hover:bg-muted/50 hover:text-foreground"
+                className="w-full justify-start bg-background/50 border-border/50 text-foreground hover:bg-muted/50 hover:text-foreground shadow-sm hover:shadow-md"
                 onClick={() => {
                   onSearchOpen?.()
                   setIsMobileMenuOpen(false)
                 }}
               >
-                <Search className="w-4 h-4 mr-2" />
-                <span>Search documentation...</span>
+                <Search className="w-4 h-4 mr-2 flex-shrink-0" />
+                <span className="flex-1 text-left">Search documentation...</span>
               </Button>
 
               {/* Mobile Navigation */}

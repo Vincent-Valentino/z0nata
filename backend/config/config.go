@@ -8,9 +8,17 @@ import (
 	"time"
 
 	"backend/models"
+
+	"github.com/joho/godotenv"
 )
 
 func LoadConfig() models.Config {
+	// Load .env file
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("No .env file found or error loading .env file")
+	}
+
 	config := models.Config{
 		Server: models.ServerConfig{
 			Port:        getEnv("PORT", "8080"),
@@ -26,12 +34,12 @@ func LoadConfig() models.Config {
 			ShutdownTimeout: getEnvDuration("SHUTDOWN_TIMEOUT", 10*time.Second),
 		},
 		Database: models.DatabaseConfig{
-			URI:         getEnvRequired("MONGO_URI"),
+			URI:         getEnv("MONGO_URI", "mongodb://localhost:27017"),
 			Name:        getEnv("MONGO_DB_NAME", "quizapp"),
 			MaxPoolSize: uint64(getEnvInt("MONGO_MAX_POOL_SIZE", 100)),
 		},
 		JWT: models.JWTConfig{
-			SecretKey:            getEnvRequired("JWT_SECRET_KEY"),
+			SecretKey:            getEnv("JWT_SECRET_KEY", "abubakar"),
 			AccessTokenDuration:  getEnvDuration("JWT_ACCESS_DURATION", 15*time.Minute),
 			RefreshTokenDuration: getEnvDuration("JWT_REFRESH_DURATION", 7*24*time.Hour),
 			RememberMeDuration:   getEnvDuration("JWT_REMEMBER_DURATION", 30*24*time.Hour),
@@ -65,9 +73,9 @@ func LoadConfig() models.Config {
 		Email: models.EmailConfig{
 			SMTPHost:     getEnv("SMTP_HOST", "smtp.gmail.com"),
 			SMTPPort:     getEnvInt("SMTP_PORT", 587),
-			SMTPUsername: getEnvRequired("SMTP_USERNAME"),
-			SMTPPassword: getEnvRequired("SMTP_PASSWORD"),
-			FromEmail:    getEnvRequired("FROM_EMAIL"),
+			SMTPUsername: getEnv("SMTP_USERNAME", ""),
+			SMTPPassword: getEnv("SMTP_PASSWORD", ""),
+			FromEmail:    getEnv("FROM_EMAIL", ""),
 			FromName:     getEnv("FROM_NAME", "QuizApp"),
 		},
 	}
