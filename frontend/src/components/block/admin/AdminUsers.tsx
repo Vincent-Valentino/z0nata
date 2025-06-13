@@ -101,12 +101,6 @@ export const AdminUsers = () => {
     return user.type === userFilter && matchesSearch
   })
 
-  const getUserTypeIcon = (type: string) => {
-    return type === 'mahasiswa_mikroskiul' ? 
-      <GraduationCap className="h-4 w-4" /> : 
-      <Users className="h-4 w-4" />
-  }
-
   const getUserTypeBadge = (type: string) => {
     return type === 'mahasiswa_mikroskiul' ? 
       <Badge variant="default" className="bg-green-100 text-green-700">Mahasiswa</Badge> :

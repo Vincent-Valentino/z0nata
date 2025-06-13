@@ -98,7 +98,7 @@ export const MockTestPage = () => {
         correct++
       } else if (q.type === 'multiple' && Array.isArray(userAnswer) && Array.isArray(q.correctAnswer)) {
         if (userAnswer.length === q.correctAnswer.length && 
-            userAnswer.every(a => q.correctAnswer.includes(a))) {
+            userAnswer.every(a => q.correctAnswer?.includes(a))) {
           correct++
         }
       }

@@ -5,8 +5,7 @@ import {
   MarkdownRenderer, 
   DocumentSidebar, 
   DocumentNavbar, 
-  SearchDialog,
-  getDefaultDocSections 
+  SearchDialog
 } from '@/components/block/docs'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -38,7 +37,6 @@ const DocumentationContent = () => {
   const [recentSearches, setRecentSearches] = useState<string[]>([])
   const [modules, setModules] = useState<Module[]>([])
   const [sections, setSections] = useState<DocSection[]>([])
-  const [error, setError] = useState<string | null>(null)
 
   // Load recent searches from localStorage
   useEffect(() => {
@@ -60,7 +58,6 @@ const DocumentationContent = () => {
   const fetchPublishedModules = async () => {
     try {
       setIsLoading(true)
-      setError(null)
       const response = await moduleService.getModules({ published: true, limit: 100 })
       setModules(response.modules || [])
       
@@ -84,7 +81,6 @@ const DocumentationContent = () => {
         setActiveSection(docSections[0].id)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch documentation')
       console.error('Error fetching documentation:', err)
       setModules([]) // Ensure modules is always an array, never null
       setSections([]) // Clear sections on error

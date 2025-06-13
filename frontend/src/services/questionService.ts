@@ -183,14 +183,13 @@ export const questionService = {
 }
 
 // Hook for easier use in React components (optional - using React Query would be better)
-export const useQuestions = (params?: ListQuestionsRequest) => {
+export const useQuestions = () => {
   // This would be better implemented with React Query or SWR for caching
   // For now, this is just a structure suggestion
   return {
-    questions: [] as QuestionDisplay[],
+    questions: [],
     loading: false,
     error: null,
-    refetch: () => {},
-    stats: null as QuestionStats | null
+    refetch: () => Promise.resolve()
   }
 } 

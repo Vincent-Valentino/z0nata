@@ -125,13 +125,11 @@ export const moduleService = {
 }
 
 // Hook for easier use in components (optional - using React Query would be better)
-export const useModules = (params?: GetModulesRequest) => {
-  // This would be better implemented with React Query or SWR for caching
-  // For now, this is just a structure suggestion
+export const useModules = () => {
   return {
     modules: [],
     loading: false,
     error: null,
-    refetch: () => {},
+    refetch: () => Promise.resolve()
   }
 } 

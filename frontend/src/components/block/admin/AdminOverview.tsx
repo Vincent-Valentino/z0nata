@@ -13,15 +13,13 @@ import {
   Share2,
   Activity,
   AlertCircle,
-  CheckCircle,
   Clock,
   TrendingUp,
   Loader2,
   RefreshCw,
   ExternalLink
 } from 'lucide-react'
-import { adminService, type AdminStats, type ActivityLogItem } from '@/services/adminService'
-import { useAuthStore } from '@/store/authStore'
+import { adminService, type AdminStats } from '@/services/adminService'
 
 interface StatCard {
   title: string
@@ -39,7 +37,6 @@ interface AdminOverviewProps {
 }
 
 export const AdminOverview = ({ onSectionChange }: AdminOverviewProps) => {
-  const { user } = useAuthStore()
   const [adminStats, setAdminStats] = useState<AdminStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

@@ -1,11 +1,8 @@
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import remarkToc from 'remark-toc'
-import rehypeHighlight from 'rehype-highlight'
 import rehypeSlug from 'rehype-slug'
 import rehypeAutolinkHeadings from 'rehype-autolink-headings'
 import rehypeRaw from 'rehype-raw'
-import { useTheme } from '@/components/ThemeProvider'
 import { cn } from '@/lib/utils'
 import { Copy, Check, ExternalLink } from 'lucide-react'
 import { useState } from 'react'
@@ -18,14 +15,13 @@ interface MarkdownRendererProps {
 }
 
 export const MarkdownRenderer = ({ content, className }: MarkdownRendererProps) => {
-  const { resolvedTheme } = useTheme()
-  const [copiedCode, setCopiedCode] = useState<string>('')
+  const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
 
   const copyToClipboard = async (code: string, id: string) => {
     try {
       await navigator.clipboard.writeText(code)
-      setCopiedCode(id)
-      setTimeout(() => setCopiedCode(''), 2000)
+      setCopiedStates({ [id]: true })
+      setTimeout(() => setCopiedStates({}), 2000)
     } catch (err) {
       console.error('Failed to copy:', err)
     }
@@ -50,7 +46,7 @@ export const MarkdownRenderer = ({ content, className }: MarkdownRendererProps) 
               onClick={() => copyToClipboard(code, codeId)}
               className="h-8 px-2 text-xs hover:bg-background/80 text-muted-foreground hover:text-foreground"
             >
-              {copiedCode === codeId ? (
+              {copiedStates[codeId] ? (
                 <>
                   <Check className="w-3 h-3 mr-1" />
                   Copied
@@ -448,10 +444,9 @@ export const MarkdownRenderer = ({ content, className }: MarkdownRendererProps) 
         }
       `}</style>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkToc]}
+        remarkPlugins={[remarkGfm]}
         rehypePlugins={[
           rehypeSlug,
-          rehypeHighlight,
           [rehypeAutolinkHeadings, { behavior: 'wrap' }],
           rehypeRaw
         ]}

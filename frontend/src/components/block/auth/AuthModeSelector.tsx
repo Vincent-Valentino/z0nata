@@ -1,6 +1,6 @@
+import { motion } from 'motion/react'
+import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { motion, AnimatePresence } from 'motion/react'
-import { ArrowLeft, Waves } from 'lucide-react'
 
 type AuthMode = 'mikroskil' | 'regular'
 

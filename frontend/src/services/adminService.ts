@@ -1,6 +1,5 @@
-import { api } from '@/lib/api'
-import { questionService, type QuestionStats } from './questionService'
-import { moduleService, type GetModulesResponse } from './moduleService'
+import { questionService } from './questionService'
+import { moduleService } from './moduleService'
 
 export interface AdminStats {
   users: {

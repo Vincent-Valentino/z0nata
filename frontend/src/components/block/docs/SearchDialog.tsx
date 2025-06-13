@@ -1,5 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react'
-import { Search, FileText, Hash, Clock, ArrowRight } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { 
+  Search, 
+  Clock,
+  ArrowRight,
+  Hash
+} from 'lucide-react'
 import {
   CommandDialog,
   CommandInput,
@@ -9,7 +14,6 @@ import {
   CommandItem,
 } from '@/components/ui/command'
 import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
 
 interface DocSection {
   id: string

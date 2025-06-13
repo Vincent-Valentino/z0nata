@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useAuthStore, loginAsAdminDirect, loginAsStudentDirect, getAdminUser, getStudentUser } from '@/store/authStore'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'

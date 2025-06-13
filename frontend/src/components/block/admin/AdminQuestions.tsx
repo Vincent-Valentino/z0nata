@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -10,7 +10,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   Plus, 
   Search, 
-  Filter, 
   Edit, 
   Trash2, 
   FileText, 
@@ -27,7 +26,7 @@ import {
   TrendingUp
 } from 'lucide-react'
 import { questionService, convertQuestionToDisplay, convertDisplayToRequest } from '@/services/questionService'
-import type { QuestionDisplay, CreateQuestionRequest, Option, ListQuestionsResponse } from '@/services/questionService'
+import type { QuestionDisplay } from '@/services/questionService'
 
 // Use QuestionDisplay interface for component state (camelCase)
 type Question = QuestionDisplay

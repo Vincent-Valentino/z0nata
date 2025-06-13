@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Separator } from '@/components/ui/separator'
 import { 
   Plus, 
   Search, 
@@ -21,12 +20,10 @@ import {
   File,
   Loader2,
   AlertCircle,
-  CheckCircle,
   Clock,
   Globe,
   EyeOff,
-  Save,
-  X
+  Save
 } from 'lucide-react'
 import { moduleService, type Module } from '@/services/moduleService'
 import { MarkdownRenderer } from '@/components/block/docs/MarkdownRenderer'

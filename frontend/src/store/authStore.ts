@@ -146,16 +146,12 @@ export const getStudentUser = (): User => ({
 
 // Development login functions that create real JWT tokens
 export const useLoginAsAdmin = () => {
-  const { login } = useAuthStore()
-  
   return async () => {
     return await loginAsAdminDirect()
   }
 }
 
 export const useLoginAsStudent = () => {
-  const { login } = useAuthStore()
-  
   return async () => {
     return await loginAsStudentDirect()
   }

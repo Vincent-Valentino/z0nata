@@ -145,8 +145,7 @@ export const HomeNavbar = () => {
         </MobileNavHeader>
         
         <MobileNavMenu 
-          isOpen={isMobileMenuOpen} 
-          onClose={handleMobileMenuClose}
+          isOpen={isMobileMenuOpen}
         >
           {navItems.map((item, idx) => (
             <Link
