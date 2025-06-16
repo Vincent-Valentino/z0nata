@@ -9,7 +9,7 @@ function App() {
       <AppRouter />
       <Toaster />
       {/* Development Tools Panel - only show in development */}
-      {process.env.NODE_ENV === 'development' && <DevToolsPanel />}
+      <DevToolsPanel />
     </ThemeProvider>
   )
 }

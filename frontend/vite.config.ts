@@ -12,4 +12,14 @@ export default defineConfig({
     },
   },
   assetsInclude: ['**/*.md'],
+  server: {
+    port: 5173,
+    host: '0.0.0.0', // Allow access from all interfaces (needed for Docker)
+    strictPort: true, // Exit if port is already in use
+  },
+  preview: {
+    port: 5173,
+    host: '0.0.0.0',
+    strictPort: true,
+  },
 })

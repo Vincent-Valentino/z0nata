@@ -13,6 +13,7 @@ export interface User {
   
   // Extended fields for frontend
   role?: 'student' | 'admin'
+  user_type?: 'mahasiswa' | 'user' | 'admin' // Backend user type distinction
   nim?: string // for mahasiswa
   faculty?: string
   major?: string
@@ -381,7 +382,179 @@ export const debugAuth = {
   }
 }
 
+// OAuth login functions
+export const handleOAuthLogin = async (provider: string, userType: 'mahasiswa' | 'admin' | 'user' = 'user') => {
+  const { login } = useAuthStore.getState()
+  
+  try {
+    console.log(`🔗 Starting OAuth login with ${provider} as ${userType}...`)
+    
+    // Get OAuth URL from backend
+    const urlResponse = await fetch(`http://localhost:8080/api/v1/auth/oauth/${provider}/url?user_type=${userType}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+    
+    if (!urlResponse.ok) {
+      throw new Error(`Failed to get OAuth URL: ${urlResponse.statusText}`)
+    }
+    
+    const urlData = await urlResponse.json()
+    console.log('✅ OAuth URL received:', urlData.auth_url)
+    
+    // Open OAuth popup
+    const popup = window.open(
+      urlData.auth_url,
+      'oauth-login',
+      'width=500,height=600,scrollbars=yes,resizable=yes'
+    )
+    
+    if (!popup) {
+      throw new Error('Failed to open OAuth popup. Please allow popups for this site.')
+    }
+    
+    // Listen for OAuth callback
+    return new Promise<boolean>((resolve, reject) => {
+      const checkClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkClosed)
+          reject(new Error('OAuth popup was closed by user'))
+        }
+      }, 1000)
+      
+      // Listen for message from popup
+      const messageListener = async (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) return
+        
+        if (event.data.type === 'OAUTH_BACKEND_SUCCESS') {
+          // Backend callback - tokens are already available
+          clearInterval(checkClosed)
+          window.removeEventListener('message', messageListener)
+          popup.close()
+          
+          try {
+            console.log('✅ OAuth backend callback successful')
+            
+            // Create user object from backend callback data
+            const user: User = {
+              id: 'oauth-user-' + Date.now(), // Temporary ID
+              full_name: 'OAuth User',
+              email: 'oauth@example.com',
+              email_verified: true,
+              profile_picture: '',
+              last_login: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              role: event.data.user_type === 'admin' ? 'admin' : 'student',
+              user_type: event.data.user_type,
+              is_admin: event.data.user_type === 'admin',
+              permissions: event.data.user_type === 'admin' ? ['read', 'write', 'delete', 'admin'] : ['read'],
+              preferences: {
+                theme: 'light',
+                language: 'en',
+                notifications: true,
+              },
+              stats: {
+                testsCompleted: 0,
+                averageScore: 0,
+                totalTimeSpent: 0,
+                streak: 0,
+              },
+            }
+
+            login(user, event.data.access_token, event.data.refresh_token)
+            console.log('✅ OAuth backend login completed successfully')
+            resolve(true)
+          } catch (error) {
+            console.error('❌ OAuth backend callback error:', error)
+            reject(error)
+          }
+        } else if (event.data.type === 'OAUTH_SUCCESS') {
+          // Frontend callback - process code
+          clearInterval(checkClosed)
+          window.removeEventListener('message', messageListener)
+          popup.close()
+          
+          try {
+            // Send OAuth data to backend
+            const loginResponse = await fetch('http://localhost:8080/api/v1/auth/oauth/callback', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                provider: provider,
+                code: event.data.code,
+                user_type: userType,
+              }),
+            })
+            
+            if (loginResponse.ok) {
+              const data = await loginResponse.json()
+              console.log('✅ OAuth frontend callback successful:', data)
+              
+              // Map backend user data to frontend User interface
+              const user: User = {
+                id: data.user.id || data.user._id,
+                full_name: data.user.full_name,
+                email: data.user.email,
+                email_verified: data.user.email_verified,
+                profile_picture: data.user.profile_picture,
+                last_login: data.user.last_login || new Date().toISOString(),
+                created_at: data.user.created_at || new Date().toISOString(),
+                updated_at: data.user.updated_at || new Date().toISOString(),
+                role: userType === 'admin' ? 'admin' : 'student',
+                user_type: userType,
+                is_admin: data.user.is_admin || userType === 'admin',
+                permissions: data.user.permissions || (userType === 'admin' ? ['read', 'write', 'delete', 'admin'] : ['read']),
+                nim: data.user.nim || data.user.mahasiswa_id,
+                faculty: data.user.faculty,
+                major: data.user.major,
+                preferences: {
+                  theme: 'light',
+                  language: 'en',
+                  notifications: true,
+                },
+                stats: {
+                  testsCompleted: 0,
+                  averageScore: 0,
+                  totalTimeSpent: 0,
+                  streak: 0,
+                },
+              }
+
+              login(user, data.access_token, data.refresh_token)
+              console.log('✅ OAuth frontend login completed successfully')
+              resolve(true)
+            } else {
+              const errorText = await loginResponse.text()
+              console.error('❌ OAuth frontend login failed:', errorText)
+              reject(new Error(`OAuth login failed: ${errorText}`))
+            }
+          } catch (error) {
+            console.error('❌ OAuth frontend callback error:', error)
+            reject(error)
+          }
+        } else if (event.data.type === 'OAUTH_ERROR') {
+          clearInterval(checkClosed)
+          window.removeEventListener('message', messageListener)
+          popup.close()
+          reject(new Error(event.data.error || 'OAuth login failed'))
+        }
+      }
+      
+      window.addEventListener('message', messageListener)
+    })
+  } catch (error) {
+    console.error('❌ OAuth login error:', error)
+    throw error
+  }
+}
+
 // Make debug function available globally in development
 if (process.env.NODE_ENV === 'development') {
   ;(window as any).debugAuth = debugAuth
+  ;(window as any).handleOAuthLogin = handleOAuthLogin
 } 

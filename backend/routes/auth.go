@@ -4,7 +4,6 @@ import (
 	"backend/controllers"
 	"backend/middleware"
 	"backend/models"
-	"backend/utils"
 	"net/http"
 	"os"
 	"time"
@@ -41,11 +40,8 @@ func SetupAuthRoutes(router gin.IRouter, userController *controllers.UserControl
 					Permissions: []string{"read", "write", "delete", "admin"},
 				}
 
-				// Generate a real JWT token
-				jwtManager := utils.NewJWTManager(models.JWTConfig{
-					SecretKey:           "abubakar", // Use the same secret as in config
-					AccessTokenDuration: 15 * time.Minute,
-				})
+				// Get JWT manager from auth middleware to use the same configuration
+				jwtManager := authMiddleware.GetJWTManager()
 
 				accessToken, err := jwtManager.GenerateAccessToken(
 					adminUser.ID,
@@ -69,7 +65,7 @@ func SetupAuthRoutes(router gin.IRouter, userController *controllers.UserControl
 					User:         adminUser,
 					AccessToken:  accessToken,
 					RefreshToken: refreshToken,
-					ExpiresIn:    int64(15 * time.Minute / time.Second),
+					ExpiresIn:    int64(jwtManager.GetAccessTokenExpiry().Seconds()),
 				})
 			})
 
@@ -92,14 +88,10 @@ func SetupAuthRoutes(router gin.IRouter, userController *controllers.UserControl
 					NIM:     "2021001234",
 					Faculty: "Fakultas Teknik",
 					Major:   "Teknik Informatika",
-					Status:  "active",
 				}
 
-				// Generate a real JWT token
-				jwtManager := utils.NewJWTManager(models.JWTConfig{
-					SecretKey:           "abubakar", // Use the same secret as in config
-					AccessTokenDuration: 15 * time.Minute,
-				})
+				// Get JWT manager from auth middleware to use the same configuration
+				jwtManager := authMiddleware.GetJWTManager()
 
 				accessToken, err := jwtManager.GenerateAccessToken(
 					studentUser.ID,
@@ -123,7 +115,7 @@ func SetupAuthRoutes(router gin.IRouter, userController *controllers.UserControl
 					User:         studentUser,
 					AccessToken:  accessToken,
 					RefreshToken: refreshToken,
-					ExpiresIn:    int64(15 * time.Minute / time.Second),
+					ExpiresIn:    int64(jwtManager.GetAccessTokenExpiry().Seconds()),
 				})
 			})
 		}
@@ -148,6 +140,12 @@ func SetupAuthRoutes(router gin.IRouter, userController *controllers.UserControl
 		// OAuth
 		auth.GET("/oauth/:provider/url", userController.GetOAuthURL)
 		auth.POST("/oauth/callback", userController.OAuthCallback)
+
+		// OAuth callback routes
+		auth.GET("/oauth/google/callback", userController.GoogleOAuthCallback)
+		auth.GET("/oauth/facebook/callback", userController.FacebookOAuthCallback)
+		auth.GET("/oauth/x/callback", userController.XOAuthCallback)
+		auth.GET("/oauth/github/callback", userController.GithubOAuthCallback)
 	}
 
 	// Protected auth routes (require authentication)

@@ -183,8 +183,8 @@ func (r *userRepository) GetByOAuthID(ctx context.Context, provider, oauthID str
 		fieldName = "google_id"
 	case "facebook":
 		fieldName = "facebook_id"
-	case "apple":
-		fieldName = "apple_id"
+	case "x":
+		fieldName = "x_id"
 	case "github":
 		fieldName = "github_id"
 	default:
@@ -461,7 +461,7 @@ func (r *userRepository) ListUsers(ctx context.Context, req *models.ListUsersReq
 						FullName:      u.FullName,
 						Email:         u.Email,
 						UserType:      models.UserTypeMahasiswa,
-						Status:        models.UserStatus(u.Status),
+						Status:        u.Status,
 						EmailVerified: u.EmailVerified,
 						LastLogin:     u.LastLogin,
 						CreatedAt:     u.CreatedAt,

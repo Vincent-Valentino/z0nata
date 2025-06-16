@@ -1,344 +1,277 @@
-# 🎓 QuizApp - Interactive Learning Platform
+# 🎓 Zonata QuizApp
 
-A full-stack web application for creating and taking quizzes, built with React (frontend) and Go (backend), using MongoDB as the database.
+A modern, full-stack quiz application built with React (Frontend) and Go (Backend), using MongoDB Atlas as the database.
 
 ## 🏗️ Architecture
 
-- **Frontend**: React + TypeScript + Vite + TailwindCSS
-- **Backend**: Go + Gin Framework + MongoDB
-- **Database**: MongoDB with automated initialization
-- **Containerization**: Docker + Docker Compose
+- **Frontend**: React + TypeScript + Vite + Tailwind CSS
+- **Backend**: Go + Gin + MongoDB Driver
+- **Database**: MongoDB Atlas
+- **Deployment**: Docker + Docker Compose
 
-## 🚀 Quick Start with Docker
+## 🚀 Quick Start
 
 ### Prerequisites
-- [Docker](https://www.docker.com/get-started) installed on your system
-- [Docker Compose](https://docs.docker.com/compose/install/) (included with Docker Desktop)
 
-### 1. Clone and Start
+- Docker & Docker Compose
+- Git
+
+### 1. Clone the Repository
+
 ```bash
-# Clone the repository (or extract from archive)
-git clone <repository-url>  # or extract zip
+git clone <your-repo-url>
 cd quizapp
-
-# Start all services
-docker-compose up --build
 ```
 
-### 2. Access the Application
+### 2. Environment Setup
+
+The application is configured to use MongoDB Atlas with your connection string. Run the setup script:
+
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+Or manually create `.env` file:
+
+```bash
+cp env.example .env
+```
+
+### 3. Configure Environment Variables
+
+Edit the `.env` file and update these important values:
+
+```env
+# Database (MongoDB Atlas) - Already configured
+MONGODB_URI=mongodb+srv://valentinolubu2:iniesta8@z0nata.sbg8h09.mongodb.net/
+MONGODB_DATABASE=z0nata
+
+# JWT Secret - CHANGE THIS!
+JWT_SECRET=your_super_secret_jwt_key_here
+
+# Email Configuration (for password reset)
+EMAIL_USERNAME=your-email@gmail.com
+EMAIL_PASSWORD=your-app-specific-password
+
+# OAuth (Optional)
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+```
+
+### 4. Start the Application
+
+```bash
+docker-compose up --build -d
+```
+
+### 5. Access the Application
+
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8080
-- **MongoDB**: localhost:27017
-
-### 3. Default Credentials
-- **Admin**: admin@quizapp.com
-- **Test Login**: Available through dev tools panel (development mode)
-
-## 📦 Docker Services
-
-| Service | Port | Description |
-|---------|------|-------------|
-| frontend | 3000 | React application served by Nginx |
-| backend | 8080 | Go API server |
-| mongo | 27017 | MongoDB database with initialization |
-
-## 🛠️ Development Workflow
-
-### Full Stack Development
-```bash
-# Start all services in development mode
-docker-compose up --build
-
-# View logs for specific service
-docker-compose logs -f frontend
-docker-compose logs -f backend
-docker-compose logs -f mongo
-
-# Rebuild specific service
-docker-compose up --build frontend
-
-# Stop all services
-docker-compose down
-```
-
-### Individual Service Development
-
-#### Frontend Only
-```bash
-cd frontend
-docker build -t quizapp-frontend .
-docker run -p 3000:80 quizapp-frontend
-```
-
-#### Backend Only
-```bash
-cd backend
-docker build -t quizapp-backend .
-docker run -p 8080:8080 quizapp-backend
-```
-
-## 🗄️ Database Initialization
-
-The MongoDB container automatically:
-- Creates the `quizapp` database
-- Sets up collections with validation schemas
-- Creates optimized indexes
-- Inserts sample data for testing
-
-### Sample Data Includes:
-- Admin user: `admin@quizapp.com`
-- 3 sample questions (single choice, multiple choice, essay)
-- 1 sample learning module
-- Proper collection schemas and indexes
-
-## 🔧 Configuration
-
-### Environment Variables
-
-#### Frontend (React)
-```bash
-NODE_ENV=production
-REACT_APP_API_URL=http://localhost:8080
-REACT_APP_ENABLE_DEV_TOOLS=true
-```
-
-#### Backend (Go)
-```bash
-PORT=8080
-MONGODB_URI=mongodb://mongo:27017/quizapp
-GIN_MODE=release
-JWT_SECRET=your-secret-key
-```
-
-#### MongoDB
-```bash
-MONGO_INITDB_DATABASE=quizapp
-```
-
-### Custom Configuration
-Edit `docker-compose.yml` to modify:
-- Port mappings
-- Environment variables
-- Volume mounts
-- Network settings
-
-## 📋 Available Commands
-
-### Docker Compose Commands
-```bash
-# Start services
-docker-compose up                    # Foreground
-docker-compose up -d                 # Background
-docker-compose up --build            # Rebuild and start
-
-# Stop services
-docker-compose stop                  # Stop containers
-docker-compose down                  # Stop and remove containers
-docker-compose down -v               # Stop and remove volumes
-
-# View logs
-docker-compose logs                  # All services
-docker-compose logs frontend         # Specific service
-docker-compose logs -f backend       # Follow logs
-
-# Execute commands in containers
-docker-compose exec frontend sh      # Shell into frontend
-docker-compose exec backend sh       # Shell into backend
-docker-compose exec mongo mongosh    # MongoDB shell
-```
-
-### Individual Container Commands
-```bash
-# List running containers
-docker ps
-
-# View container logs
-docker logs quizapp-frontend
-docker logs quizapp-backend
-docker logs quizapp-mongo
-
-# Execute commands
-docker exec -it quizapp-backend sh
-docker exec -it quizapp-mongo mongosh quizapp
-```
-
-## 🏥 Health Checks
-
-The setup includes health checks for all services:
-
-```bash
-# Check service health
-docker-compose ps
-
-# Check container health
-docker inspect --format='{{.State.Health.Status}}' quizapp-backend
-docker inspect --format='{{.State.Health.Status}}' quizapp-mongo
-```
-
-## 🔍 Monitoring & Debugging
-
-### View Service Status
-```bash
-# Check all services
-docker-compose ps
-
-# Check specific service logs
-docker-compose logs -f --tail=100 backend
-```
-
-### Access Container Shells
-```bash
-# Frontend (Nginx)
-docker-compose exec frontend sh
-
-# Backend (Go)
-docker-compose exec backend sh
-
-# Database (MongoDB)
-docker-compose exec mongo mongosh quizapp
-```
-
-### Database Operations
-```bash
-# Connect to MongoDB
-docker-compose exec mongo mongosh quizapp
-
-# View collections
-show collections
-
-# Query sample data
-db.users.find().pretty()
-db.questions.find().pretty()
-db.modules.find().pretty()
-```
-
-## 🚦 Production Deployment
-
-### Build Production Images
-```bash
-# Build all services for production
-docker-compose -f docker-compose.prod.yml build
-
-# Or build individually
-docker build -t quizapp-frontend:prod ./frontend
-docker build -t quizapp-backend:prod ./backend
-```
-
-### Environment-Specific Overrides
-```bash
-# Development
-docker-compose up
-
-# Production (create docker-compose.prod.yml)
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
-```
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-#### Port Conflicts
-```bash
-# Check what's using ports
-lsof -i :3000
-lsof -i :8080
-lsof -i :27017
-
-# Use different ports
-docker-compose up --scale frontend=0
-docker run -p 3001:80 quizapp-frontend
-```
-
-#### Build Failures
-```bash
-# Clear Docker cache
-docker system prune -a
-
-# Rebuild without cache
-docker-compose build --no-cache
-
-# Check Docker disk space
-docker system df
-```
-
-#### Database Connection Issues
-```bash
-# Check MongoDB logs
-docker-compose logs mongo
-
-# Verify network connectivity
-docker-compose exec backend ping mongo
-
-# Reset database
-docker-compose down -v
-docker-compose up
-```
-
-#### Container Won't Start
-```bash
-# Check container status
-docker-compose ps
-
-# View detailed logs
-docker-compose logs service-name
-
-# Check resource usage
-docker stats
-```
-
-### Reset Everything
-```bash
-# Nuclear option - removes everything
-docker-compose down -v
-docker system prune -a
-docker-compose up --build
-```
+- **Health Check**: http://localhost:8080/health
 
 ## 📁 Project Structure
 
 ```
 quizapp/
 ├── frontend/                 # React frontend
-│   ├── src/                 # Source code
-│   ├── Dockerfile           # Frontend container config
-│   ├── .dockerignore        # Frontend Docker ignore
-│   └── README-Docker.md     # Frontend Docker guide
+│   ├── src/
+│   │   ├── components/      # UI components
+│   │   ├── pages/          # Page components
+│   │   ├── services/       # API services
+│   │   └── types/          # TypeScript types
+│   ├── Dockerfile
+│   └── package.json
 ├── backend/                 # Go backend
-│   ├── main.go             # Main application
-│   ├── Dockerfile          # Backend container config
-│   └── go.mod              # Go dependencies
-├── scripts/                # Database scripts
-│   └── mongo-init.js       # MongoDB initialization
-├── docker-compose.yml      # Multi-service orchestration
-└── README.md              # This file
+│   ├── controllers/        # HTTP handlers
+│   ├── models/            # Data models
+│   ├── services/          # Business logic
+│   ├── repository/        # Database layer
+│   ├── config/            # Configuration
+│   ├── middleware/        # HTTP middleware
+│   ├── routes/            # Route definitions
+│   ├── utils/             # Utilities
+│   ├── Dockerfile
+│   └── go.mod
+├── docker-compose.yml      # Docker orchestration
+├── env.example            # Environment template
+└── setup.sh              # Setup script
 ```
 
-## 🤝 Development Team Setup
+## 🔧 Environment Variables
 
-For team members to get started:
+### Server Configuration
+- `SERVER_HOST` - Server host (default: localhost)
+- `SERVER_PORT` - Server port (default: 8080)
+- `SERVER_ENVIRONMENT` - Environment mode (development/production)
 
-1. **Install Docker**: [Download here](https://www.docker.com/get-started)
-2. **Clone project**: `git clone <repo>` or extract zip
-3. **Start services**: `docker-compose up --build`
-4. **Access app**: http://localhost:3000
+### Database Configuration (MongoDB Atlas)
+- `MONGODB_URI` - MongoDB Atlas connection string
+- `MONGODB_DATABASE` - Database name (default: z0nata)
+- `MONGODB_MAX_POOL_SIZE` - Connection pool size (default: 100)
 
-That's it! No need to install Node.js, Go, or MongoDB locally.
+### JWT Configuration
+- `JWT_SECRET` - JWT signing secret (REQUIRED)
+- `JWT_ACCESS_TOKEN_EXPIRY` - Access token expiry (default: 15m)
+- `JWT_REFRESH_TOKEN_EXPIRY` - Refresh token expiry (default: 168h)
 
-## 📚 Additional Resources
+### Email Configuration
+- `EMAIL_SMTP_HOST` - SMTP host (default: smtp.gmail.com)
+- `EMAIL_SMTP_PORT` - SMTP port (default: 587)
+- `EMAIL_USERNAME` - SMTP username
+- `EMAIL_PASSWORD` - SMTP password
+- `EMAIL_FROM_NAME` - Sender name
+- `EMAIL_FROM_ADDRESS` - Sender email
 
-- [Frontend Docker Guide](./frontend/README-Docker.md)
-- [Docker Documentation](https://docs.docker.com/)
-- [Docker Compose Reference](https://docs.docker.com/compose/)
-- [MongoDB Docker Hub](https://hub.docker.com/_/mongo)
+### OAuth Configuration (Optional)
+- `GOOGLE_CLIENT_ID` - Google OAuth client ID
+- `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
+- And similar for Facebook, GitHub, Apple...
 
-## 🆘 Getting Help
+## 🛠️ Development
 
-If you encounter issues:
-1. Check the troubleshooting section above
-2. View service logs: `docker-compose logs [service-name]`
-3. Check container status: `docker-compose ps`
-4. Reset environment: `docker-compose down -v && docker-compose up --build`
+### Frontend Development
 
----
+```bash
+cd frontend
+pnpm install
+pnpm run dev
+```
 
-**Happy coding! 🚀** 
+### Backend Development
+
+```bash
+cd backend
+go mod download
+go run main.go
+```
+
+### Database Management
+
+The application is configured to use MongoDB Atlas. The connection includes:
+- Automatic reconnection
+- Connection pooling
+- Optimized timeouts for cloud database
+- Index creation on startup
+
+## 📊 Docker Commands
+
+```bash
+# Start services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+
+# Rebuild and restart
+docker-compose up --build
+
+# View specific service logs
+docker-compose logs -f backend
+docker-compose logs -f frontend
+```
+
+## 🔒 Security Features
+
+- JWT-based authentication
+- Password hashing with Argon2
+- CORS protection
+- Rate limiting
+- Input validation
+- SQL injection protection (NoSQL)
+- XSS protection headers
+
+## 📈 Features
+
+### Authentication
+- User registration/login
+- JWT token-based auth
+- Password reset via email
+- OAuth integration (Google, Facebook, GitHub, Apple)
+- Role-based access control
+
+### Quiz System
+- Multiple question types (single choice, multiple choice, essay)
+- Timed quizzes
+- Mock tests
+- Result tracking
+- Performance analytics
+
+### Admin Panel
+- User management
+- Question management
+- Documentation management
+- System monitoring
+
+### Documentation
+- Markdown-based content management
+- Module and submodule organization
+- Search functionality
+- Publication control
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+1. **MongoDB Connection Issues**
+   - Verify MongoDB Atlas connection string
+   - Check network connectivity
+   - Ensure IP whitelist includes your IP
+
+2. **Docker Build Issues**
+   - Clear Docker cache: `docker system prune -a`
+   - Check Docker daemon is running
+
+3. **Environment Variables**
+   - Ensure `.env` file exists
+   - Check for typos in variable names
+   - Verify required variables are set
+
+### Logs
+
+Check application logs:
+```bash
+docker-compose logs -f backend
+docker-compose logs -f frontend
+```
+
+### Health Check
+
+Visit http://localhost:8080/health to verify backend is running.
+
+## 📝 API Documentation
+
+The backend provides a RESTful API with the following main endpoints:
+
+- `/api/v1/auth/*` - Authentication endpoints
+- `/api/v1/users/*` - User management
+- `/api/v1/questions/*` - Question management
+- `/api/v1/modules/*` - Documentation modules
+- `/api/v1/quiz/*` - Quiz functionality
+- `/health` - Health check
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+## 🆘 Support
+
+If you encounter any issues:
+
+1. Check this README
+2. Review the logs with `docker-compose logs -f`
+3. Ensure all environment variables are properly set
+4. Verify MongoDB Atlas connectivity
+5. Create an issue with detailed error information 

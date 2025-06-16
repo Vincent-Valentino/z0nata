@@ -1,5 +1,6 @@
 import { questionService } from './questionService'
 import { moduleService } from './moduleService'
+import { useAuthStore } from '../store/authStore'
 
 export interface AdminStats {
   users: {
@@ -52,11 +53,40 @@ export const adminService = {
   // Get comprehensive admin statistics
   async getAdminStats(): Promise<AdminStats> {
     try {
+      console.log('📊 Fetching admin stats...')
+      
+      // Check if user is authenticated
+      const authState = useAuthStore?.getState?.()
+      if (!authState?.isAuthenticated || !authState?.token) {
+        console.error('❌ User not authenticated for admin stats')
+        throw new Error('Authentication required')
+      }
+
+      console.log('🔑 Auth check passed, making API calls...')
+      
       // Fetch data in parallel for better performance
       const [questionStats, moduleStats] = await Promise.all([
-        questionService.getQuestionStats(),
-        moduleService.getModules({ limit: 100 })
+        questionService.getQuestionStats().catch(error => {
+          console.error('❌ Question stats failed:', error)
+          // Return fallback data
+          return {
+            total: 0,
+            single_choice: 0,
+            multiple_choice: 0,
+            essay: 0,
+            active_count: 0,
+            inactive_count: 0,
+            by_type: { single_choice: 0, multiple_choice: 0, essay: 0 }
+          }
+        }),
+        moduleService.getModules({ limit: 100 }).catch(error => {
+          console.error('❌ Module stats failed:', error)
+          // Return fallback data
+          return { modules: [], total: 0, page: 1, limit: 100 }
+        })
       ])
+
+      console.log('✅ API calls completed:', { questionStats, moduleStats })
 
       // Calculate module statistics
       const publishedModules = moduleStats.modules.filter(m => m.is_published).length
@@ -77,7 +107,7 @@ export const adminService = {
         {
           id: '1',
           type: 'question_added',
-          message: `New question added to ${questionStats.by_type.single_choice > 0 ? 'single choice' : 'question'} bank`,
+          message: `New question added to ${questionStats.by_type?.single_choice > 0 ? 'single choice' : 'question'} bank`,
           timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(), // 5 minutes ago
           user: 'admin@zonata.com',
           userType: 'admin'
@@ -100,30 +130,40 @@ export const adminService = {
         }
       ]
 
-      return {
+      const stats = {
         users: userStats,
         content: {
-          totalQuestions: questionStats.total,
+          totalQuestions: questionStats.total || 0,
           totalModules: moduleStats.modules.length,
           totalSubmodules,
           publishedModules,
           draftModules: moduleStats.modules.length - publishedModules
         },
         questions: {
-          singleChoice: questionStats.single_choice,
-          multipleChoice: questionStats.multiple_choice,
-          essay: questionStats.essay,
-          activeQuestions: questionStats.active_count,
-          inactiveQuestions: questionStats.inactive_count
+          singleChoice: questionStats.single_choice || 0,
+          multipleChoice: questionStats.multiple_choice || 0,
+          essay: questionStats.essay || 0,
+          activeQuestions: questionStats.active_count || 0,
+          inactiveQuestions: questionStats.inactive_count || 0
         },
         activity: {
           pendingRequests: userStats.pendingUsers,
           recentActivity
         }
       }
+
+      console.log('✅ Admin stats compiled successfully:', stats)
+      return stats
     } catch (error) {
-      console.error('Error fetching admin stats:', error)
-      throw new Error('Failed to fetch admin statistics')
+      console.error('❌ Error fetching admin stats:', error)
+      
+      // Check if it's an authentication error
+      if (error instanceof Error && (error.message?.includes('401') || error.message?.includes('Unauthorized'))) {
+        console.error('🔐 Authentication error - token may be invalid')
+        // You might want to trigger a re-login here
+      }
+      
+      throw new Error('Failed to fetch admin statistics: ' + (error instanceof Error ? error.message : String(error)))
     }
   },
 

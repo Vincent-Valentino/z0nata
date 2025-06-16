@@ -953,6 +953,33 @@ export const AdminDocumentation = () => {
         )}
       </div>
 
+      {/* Documentation Order Information */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Folder className="w-4 h-4" />
+            Documentation Order
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Documentation Navigation Order:</strong><br/>
+                Documentation follows a structured learning path: Module 1 → Module 1.1 → Module 1.2 → Module 2 → Module 2.1, etc.
+              </AlertDescription>
+            </Alert>
+            <div className="text-sm text-muted-foreground space-y-2">
+              <p><strong>Current Ordering:</strong> Modules and submodules are ordered by creation date (oldest first).</p>
+              <p><strong>Navigation Flow:</strong> Readers progress through each module's content, then through all its submodules before moving to the next module.</p>
+              <p><strong>Numbering:</strong> Each module gets a number (1, 2, 3...) and submodules get decimal notation (1.1, 1.2, 2.1, 2.2...).</p>
+              <p><em>Note: Only published modules and submodules appear in the documentation navigation.</em></p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Summary */}
       <Card>
         <CardHeader>

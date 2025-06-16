@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Search, Book, FileText, GraduationCap, ChevronRight, Hash, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
@@ -38,7 +38,29 @@ export const DocumentSidebar = ({
   searchValue,
   onSearchChange
 }: DocumentSidebarProps) => {
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set([activeSection]))
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
+    // Auto-expand section that contains the active item or if activeSection is a submodule
+    const initialExpanded = new Set([activeSection])
+    
+    // Check if activeSection is actually a submodule - if so, expand its parent
+    sections.forEach(section => {
+      if (section.items?.some(item => item.id === activeSection)) {
+        initialExpanded.add(section.id)
+      }
+    })
+    
+    return initialExpanded
+  })
+
+  // Update expanded sections when activeSection changes
+  useEffect(() => {
+    // Check if activeSection is a submodule and auto-expand its parent
+    sections.forEach(section => {
+      if (section.items?.some(item => item.id === activeSection)) {
+        setExpandedSections(prev => new Set([...prev, section.id]))
+      }
+    })
+  }, [activeSection, sections])
 
   const filteredSections = useMemo(() => {
     if (!searchValue) return sections
@@ -91,7 +113,7 @@ export const DocumentSidebar = ({
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto">
         <nav className="p-4 space-y-2">
-          {filteredSections.map((section) => (
+          {filteredSections.map((section, moduleIndex) => (
             <div key={section.id}>
               <Button
                 variant={activeSection === section.id ? "secondary" : "ghost"}
@@ -117,7 +139,9 @@ export const DocumentSidebar = ({
                       {section.icon}
                     </div>
                     <div className="text-left min-w-0 flex-1">
-                      <div className="font-medium truncate text-sm text-foreground">{section.title}</div>
+                      <div className="font-medium truncate text-sm text-foreground">
+                        {moduleIndex + 1}. {section.title}
+                      </div>
                       <div className="text-xs text-muted-foreground truncate mt-0.5">
                         {section.description}
                       </div>
@@ -137,14 +161,14 @@ export const DocumentSidebar = ({
               {/* Subsections */}
               {section.items && expandedSections.has(section.id) && (
                 <div className="ml-4 mt-2 space-y-1 border-l border-border/30 pl-2">
-                  {section.items.map((item) => (
+                  {section.items.map((item, subIndex) => (
                     <Button
                       key={item.id}
-                      variant={activeItem === item.id ? "secondary" : "ghost"}
+                      variant={activeItem === item.id || activeSection === item.id ? "secondary" : "ghost"}
                       size="sm"
                       className={cn(
                         "w-full justify-start text-sm transition-colors duration-200 h-8 text-foreground",
-                        activeItem === item.id 
+                        (activeItem === item.id || activeSection === item.id)
                           ? "bg-secondary/60 text-secondary-foreground border border-border/50" 
                           : "hover:bg-muted/50 hover:text-foreground border border-transparent hover:border-border/20"
                       )}
@@ -152,7 +176,9 @@ export const DocumentSidebar = ({
                       style={{ paddingLeft: `${item.level * 12 + 8}px` }}
                     >
                       <Hash className="w-3 h-3 mr-2 flex-shrink-0 text-muted-foreground" />
-                      <span className="truncate text-foreground">{item.title}</span>
+                      <span className="truncate text-foreground">
+                        {moduleIndex + 1}.{subIndex + 1} {item.title}
+                      </span>
                     </Button>
                   ))}
                 </div>

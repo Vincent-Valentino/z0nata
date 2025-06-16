@@ -439,3 +439,89 @@ func (mc *ModuleController) ToggleSubModulePublication(c *gin.Context) {
 
 	c.JSON(http.StatusOK, subModule)
 }
+
+// @Summary Reorder modules
+// @Description Update the display order of multiple modules (Admin only)
+// @Tags modules
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body map[string][]string true "Module order mapping"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Router /admin/modules/reorder [post]
+func (mc *ModuleController) ReorderModules(c *gin.Context) {
+	userID, exists := middleware.GetUserID(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		return
+	}
+
+	var req struct {
+		ModuleIDs []string `json:"module_ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request data",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	err := mc.moduleService.ReorderModules(c.Request.Context(), req.ModuleIDs, userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Modules reordered successfully"})
+}
+
+// @Summary Reorder submodules
+// @Description Update the display order of submodules within a module (Admin only)
+// @Tags submodules
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param moduleId path string true "Module ID"
+// @Param request body map[string][]string true "Submodule order mapping"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Router /admin/modules/{moduleId}/submodules/reorder [post]
+func (mc *ModuleController) ReorderSubModules(c *gin.Context) {
+	userID, exists := middleware.GetUserID(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		return
+	}
+
+	moduleIDStr := c.Param("moduleId")
+	moduleID, err := primitive.ObjectIDFromHex(moduleIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid module ID"})
+		return
+	}
+
+	var req struct {
+		SubModuleIDs []string `json:"submodule_ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request data",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	err = mc.moduleService.ReorderSubModules(c.Request.Context(), moduleID, req.SubModuleIDs, userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Submodules reordered successfully"})
+}

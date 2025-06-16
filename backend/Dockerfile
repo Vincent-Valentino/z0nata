@@ -20,6 +20,9 @@ RUN go mod verify
 # Copy source code
 COPY . .
 
+# Copy .env file if it exists (optional, since we also use Docker env vars)
+COPY .env* ./
+
 # Build the application
 # CGO_ENABLED=0 for static binary, GOOS=linux for Linux target
 RUN CGO_ENABLED=0 GOOS=linux go build \
@@ -41,6 +44,9 @@ COPY --from=builder /etc/passwd /etc/passwd
 
 # Copy the binary from builder
 COPY --from=builder --chown=appuser:appuser /build/app /app
+
+# Copy .env file from builder (if it exists)
+COPY --from=builder --chown=appuser:appuser /build/.env* ./
 
 # Use non-root user
 USER appuser

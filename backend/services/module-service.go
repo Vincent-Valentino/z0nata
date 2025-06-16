@@ -18,6 +18,8 @@ type ModuleService interface {
 	UpdateModule(ctx context.Context, moduleID primitive.ObjectID, req *models.UpdateModuleRequest, userID primitive.ObjectID) (*models.Module, error)
 	DeleteModule(ctx context.Context, moduleID primitive.ObjectID) error
 	ToggleModulePublication(ctx context.Context, moduleID primitive.ObjectID, published bool, userID primitive.ObjectID) (*models.Module, error)
+	ReorderModules(ctx context.Context, moduleIDs []string, userID primitive.ObjectID) error
+	ReorderSubModules(ctx context.Context, moduleID primitive.ObjectID, subModuleIDs []string, userID primitive.ObjectID) error
 
 	// SubModule methods
 	CreateSubModule(ctx context.Context, moduleID primitive.ObjectID, req *models.CreateSubModuleRequest, userID primitive.ObjectID) (*models.SubModule, error)
@@ -79,6 +81,19 @@ func (s *moduleService) GetModuleByID(ctx context.Context, moduleID primitive.Ob
 func (s *moduleService) CreateModule(ctx context.Context, req *models.CreateModuleRequest, userID primitive.ObjectID) (*models.Module, error) {
 	now := time.Now()
 
+	// If no order specified, set it to a high value (will be auto-ordered by creation time)
+	order := req.Order
+	if order == 0 {
+		// Get the count of existing modules to set default order
+		// This ensures new modules without explicit order go to the end
+		allModules, _, err := s.moduleRepo.GetAllModules(ctx, &models.GetModulesRequest{Page: 1, Limit: 1000})
+		if err == nil {
+			order = len(allModules) + 1
+		} else {
+			order = 999 // Fallback if query fails
+		}
+	}
+
 	module := &models.Module{
 		ID:          primitive.NewObjectID(),
 		Name:        req.Name,
@@ -86,6 +101,7 @@ func (s *moduleService) CreateModule(ctx context.Context, req *models.CreateModu
 		Content:     req.Content,
 		SubModules:  []models.SubModule{},
 		IsPublished: false, // Always start as draft
+		Order:       order,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 		CreatedBy:   userID,
@@ -94,13 +110,19 @@ func (s *moduleService) CreateModule(ctx context.Context, req *models.CreateModu
 
 	// Create submodules if provided
 	if len(req.SubModules) > 0 {
-		for _, subModuleReq := range req.SubModules {
+		for i, subModuleReq := range req.SubModules {
+			subModuleOrder := subModuleReq.Order
+			if subModuleOrder == 0 {
+				subModuleOrder = i + 1 // Auto-order submodules 1, 2, 3...
+			}
+
 			subModule := models.SubModule{
 				ID:          primitive.NewObjectID(),
 				Name:        subModuleReq.Name,
 				Description: subModuleReq.Description,
 				Content:     subModuleReq.Content,
 				IsPublished: false, // Always start as draft
+				Order:       subModuleOrder,
 				CreatedAt:   now,
 				UpdatedAt:   now,
 				CreatedBy:   userID,
@@ -133,6 +155,9 @@ func (s *moduleService) UpdateModule(ctx context.Context, moduleID primitive.Obj
 	}
 	if req.Content != nil {
 		module.Content = *req.Content
+	}
+	if req.Order != nil {
+		module.Order = *req.Order
 	}
 	if req.SubModules != nil {
 		module.SubModules = req.SubModules
@@ -181,12 +206,20 @@ func (s *moduleService) CreateSubModule(ctx context.Context, moduleID primitive.
 	}
 
 	now := time.Now()
+
+	// If no order specified, set it to be after existing submodules
+	order := req.Order
+	if order == 0 {
+		order = len(module.SubModules) + 1
+	}
+
 	subModule := models.SubModule{
 		ID:          primitive.NewObjectID(),
 		Name:        req.Name,
 		Description: req.Description,
 		Content:     req.Content,
 		IsPublished: false, // Always start as draft
+		Order:       order,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 		CreatedBy:   userID,
@@ -227,6 +260,9 @@ func (s *moduleService) UpdateSubModule(ctx context.Context, moduleID primitive.
 	module.SubModules[subModuleIndex].Name = req.Name
 	module.SubModules[subModuleIndex].Description = req.Description
 	module.SubModules[subModuleIndex].Content = req.Content
+	if req.Order != 0 {
+		module.SubModules[subModuleIndex].Order = req.Order
+	}
 	module.SubModules[subModuleIndex].UpdatedAt = time.Now()
 	module.SubModules[subModuleIndex].UpdatedBy = userID
 
@@ -302,4 +338,69 @@ func (s *moduleService) ToggleSubModulePublication(ctx context.Context, moduleID
 	}
 
 	return &module.SubModules[subModuleIndex], nil
+}
+
+func (s *moduleService) ReorderModules(ctx context.Context, moduleIDs []string, userID primitive.ObjectID) error {
+	for i, moduleIDStr := range moduleIDs {
+		moduleID, err := primitive.ObjectIDFromHex(moduleIDStr)
+		if err != nil {
+			return fmt.Errorf("invalid module ID %s: %w", moduleIDStr, err)
+		}
+
+		module, err := s.moduleRepo.GetModuleByID(ctx, moduleID)
+		if err != nil {
+			return fmt.Errorf("module not found %s: %w", moduleIDStr, err)
+		}
+
+		// Update order to match position in array (1-based)
+		module.Order = i + 1
+		module.UpdatedAt = time.Now()
+		module.UpdatedBy = userID
+
+		if err := s.moduleRepo.UpdateModule(ctx, module); err != nil {
+			return fmt.Errorf("failed to update module order %s: %w", moduleIDStr, err)
+		}
+	}
+
+	return nil
+}
+
+func (s *moduleService) ReorderSubModules(ctx context.Context, moduleID primitive.ObjectID, subModuleIDs []string, userID primitive.ObjectID) error {
+	module, err := s.moduleRepo.GetModuleByID(ctx, moduleID)
+	if err != nil {
+		return fmt.Errorf("module not found: %w", err)
+	}
+
+	// Create a map for quick lookup of submodules
+	subModuleMap := make(map[string]*models.SubModule)
+	for i := range module.SubModules {
+		subModuleMap[module.SubModules[i].ID.Hex()] = &module.SubModules[i]
+	}
+
+	// Reorder submodules according to the provided IDs
+	var reorderedSubModules []models.SubModule
+	for i, subModuleIDStr := range subModuleIDs {
+		subModule, exists := subModuleMap[subModuleIDStr]
+		if !exists {
+			return fmt.Errorf("submodule not found: %s", subModuleIDStr)
+		}
+
+		// Update order to match position in array (1-based)
+		subModule.Order = i + 1
+		subModule.UpdatedAt = time.Now()
+		subModule.UpdatedBy = userID
+
+		reorderedSubModules = append(reorderedSubModules, *subModule)
+	}
+
+	// Update module with reordered submodules
+	module.SubModules = reorderedSubModules
+	module.UpdatedAt = time.Now()
+	module.UpdatedBy = userID
+
+	if err := s.moduleRepo.UpdateModule(ctx, module); err != nil {
+		return fmt.Errorf("failed to update submodule order: %w", err)
+	}
+
+	return nil
 }

@@ -24,10 +24,16 @@ func SetupModuleRoutes(router gin.IRouter, moduleController *controllers.ModuleC
 		adminModules.DELETE("/:moduleId", moduleController.DeleteModule)
 		adminModules.PATCH("/:moduleId/publish", moduleController.ToggleModulePublication)
 
+		// Module ordering
+		adminModules.POST("/reorder", moduleController.ReorderModules)
+
 		// Submodule CRUD
 		adminModules.POST("/:moduleId/submodules", moduleController.CreateSubModule)
 		adminModules.PUT("/:moduleId/submodules/:submoduleId", moduleController.UpdateSubModule)
 		adminModules.DELETE("/:moduleId/submodules/:submoduleId", moduleController.DeleteSubModule)
 		adminModules.PATCH("/:moduleId/submodules/:submoduleId/publish", moduleController.ToggleSubModulePublication)
+
+		// Submodule ordering
+		adminModules.POST("/:moduleId/submodules/reorder", moduleController.ReorderSubModules)
 	}
 }

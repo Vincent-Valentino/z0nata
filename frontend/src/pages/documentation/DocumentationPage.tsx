@@ -59,6 +59,7 @@ const DocumentationContent = () => {
     try {
       setIsLoading(true)
       const response = await moduleService.getModules({ published: true, limit: 100 })
+      // Backend now handles ordering by order field, then created_at
       setModules(response.modules || [])
       
       // Convert modules to sections format
@@ -67,11 +68,14 @@ const DocumentationContent = () => {
         title: module.name,
         description: module.description,
         icon: <div>📚</div>, // You can customize icons based on module content
-        items: (module.sub_modules || []).filter(sub => sub.is_published).map(subModule => ({
-          id: subModule.id,
-          title: subModule.name,
-          level: 1 // All submodules are level 1 for now
-        }))
+        items: (module.sub_modules || [])
+          .filter(sub => sub.is_published)
+          // Backend now handles submodule ordering by order field, then created_at
+          .map(subModule => ({
+            id: subModule.id,
+            title: subModule.name,
+            level: 1 // All submodules are level 1 for now
+          }))
       }))
       
       setSections(docSections)
@@ -132,17 +136,40 @@ const DocumentationContent = () => {
     window.history.replaceState({}, '', url.toString())
   }
 
-  // Handle item click (scroll to section)
+  // Handle item click (switch to submodule content)
   const handleItemClick = (itemId: string) => {
-    setActiveItem(itemId)
-    
-    // Try to scroll to the element
-    setTimeout(() => {
-      const element = document.getElementById(itemId)
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // Check if this item is actually a submodule ID
+    let isSubModule = false
+    for (const module of modules || []) {
+      if (module.sub_modules && Array.isArray(module.sub_modules)) {
+        const subModule = module.sub_modules.find(sub => sub.id === itemId)
+        if (subModule) {
+          isSubModule = true
+          break
+        }
       }
-    }, 100)
+    }
+    
+    if (isSubModule) {
+      // If it's a submodule, switch to show its content
+      setActiveSection(itemId)
+      setActiveItem(undefined)
+      
+      // Update URL
+      const url = new URL(window.location.href)
+      url.searchParams.set('section', itemId)
+      window.history.replaceState({}, '', url.toString())
+    } else {
+      // If it's a regular item (heading), scroll to it
+      setActiveItem(itemId)
+      
+      setTimeout(() => {
+        const element = document.getElementById(itemId)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      }, 100)
+    }
   }
 
   // Handle search navigation
@@ -179,10 +206,43 @@ const DocumentationContent = () => {
     }
   }, [modules])
 
-  // Get navigation info
-  const currentSectionIndex = sections.findIndex(s => s.id === activeSection)
-  const previousSection = currentSectionIndex > 0 ? sections[currentSectionIndex - 1] : null
-  const nextSection = currentSectionIndex < sections.length - 1 ? sections[currentSectionIndex + 1] : null
+  // Create ordered navigation list (modules and submodules in reading order)
+  const orderedNavigation = useMemo(() => {
+    const navItems: Array<{
+      id: string
+      title: string
+      type: 'module' | 'submodule'
+      moduleId?: string
+    }> = []
+
+    sections.forEach(section => {
+      // Add the main module
+      navItems.push({
+        id: section.id,
+        title: section.title,
+        type: 'module'
+      })
+
+      // Add its submodules in order
+      if (section.items && section.items.length > 0) {
+        section.items.forEach(item => {
+          navItems.push({
+            id: item.id,
+            title: item.title,
+            type: 'submodule',
+            moduleId: section.id
+          })
+        })
+      }
+    })
+
+    return navItems
+  }, [sections])
+
+  // Get navigation info based on ordered list
+  const currentNavIndex = orderedNavigation.findIndex(item => item.id === activeSection)
+  const previousNav = currentNavIndex > 0 ? orderedNavigation[currentNavIndex - 1] : null
+  const nextNav = currentNavIndex < orderedNavigation.length - 1 ? orderedNavigation[currentNavIndex + 1] : null
 
   if (isLoading) {
     return (
@@ -231,19 +291,70 @@ const DocumentationContent = () => {
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
                   <div className="text-white">
-                    {sections.find(s => s.id === activeSection)?.icon}
+                    {(() => {
+                      // First check if activeSection is a main module
+                      const section = sections.find(s => s.id === activeSection)
+                      if (section) return section.icon
+                      
+                      // If not found, check if it's a submodule
+                      for (const module of modules || []) {
+                        if (module.sub_modules && Array.isArray(module.sub_modules)) {
+                          const subModule = module.sub_modules.find(sub => sub.id === activeSection)
+                          if (subModule) return <div>📄</div> // Different icon for submodules
+                        }
+                      }
+                      
+                      return <div>📚</div> // Default icon
+                    })()}
                   </div>
                 </div>
                 <div className="flex-1">
                   <h1 className="text-3xl font-bold text-foreground mb-2">
-                    {sections.find(s => s.id === activeSection)?.title}
+                    {(() => {
+                      // First check if activeSection is a main module
+                      const section = sections.find(s => s.id === activeSection)
+                      if (section) {
+                        const moduleIndex = sections.findIndex(s => s.id === activeSection)
+                        return `${moduleIndex + 1}. ${section.title}`
+                      }
+                      
+                      // If not found, check if it's a submodule
+                      for (let i = 0; i < (modules || []).length; i++) {
+                        const module = modules[i]
+                        if (module.sub_modules && Array.isArray(module.sub_modules)) {
+                          const subModuleIndex = module.sub_modules.findIndex(sub => sub.id === activeSection)
+                          if (subModuleIndex !== -1) {
+                            const subModule = module.sub_modules[subModuleIndex]
+                            return `${i + 1}.${subModuleIndex + 1} ${subModule.name}`
+                          }
+                        }
+                      }
+                      
+                      return 'Content not found'
+                    })()}
                   </h1>
                   <p className="text-muted-foreground">
-                    {sections.find(s => s.id === activeSection)?.description}
+                    {(() => {
+                      // First check if activeSection is a main module
+                      const section = sections.find(s => s.id === activeSection)
+                      if (section) return section.description
+                      
+                      // If not found, check if it's a submodule
+                      for (const module of modules || []) {
+                        if (module.sub_modules && Array.isArray(module.sub_modules)) {
+                          const subModule = module.sub_modules.find(sub => sub.id === activeSection)
+                          if (subModule) {
+                            return `${subModule.description} • Part of ${module.name}`
+                          }
+                        }
+                      }
+                      
+                      return 'Description not available'
+                    })()}
                   </p>
                 </div>
                 <Badge variant="secondary" className="px-3 py-1">
-                  {currentSectionIndex + 1} of {sections.length}
+                  {currentNavIndex !== -1 ? `${currentNavIndex + 1} of ${orderedNavigation.length}` : '1 of 1'}
                 </Badge>
               </div>
             </div>
@@ -262,30 +373,72 @@ const DocumentationContent = () => {
             <div className="mt-16 pt-8 border-t border-border">
               <div className="flex justify-between items-center">
                 <div>
-                  {previousSection && (
+                  {previousNav && (
                     <Button
                       variant="outline"
-                      onClick={() => handleSectionChange(previousSection.id)}
+                      onClick={() => handleSectionChange(previousNav.id)}
                       className="group"
                     >
                       <ChevronLeft className="w-4 h-4 mr-2 transition-transform group-hover:-translate-x-1" />
                       <div className="text-left">
-                        <div className="text-xs text-muted-foreground">Previous</div>
-                        <div className="font-medium">{previousSection.title}</div>
+                        <div className="text-xs text-muted-foreground">
+                          Previous {previousNav.type === 'submodule' ? 'Submodule' : 'Module'}
+                        </div>
+                        <div className="font-medium">
+                          {(() => {
+                            if (previousNav.type === 'module') {
+                              const moduleIndex = sections.findIndex(s => s.id === previousNav.id)
+                              return `${moduleIndex + 1}. ${previousNav.title}`
+                            } else {
+                              // For submodules, find the parent module and submodule index
+                              for (let i = 0; i < (modules || []).length; i++) {
+                                const module = modules[i]
+                                if (module.sub_modules && Array.isArray(module.sub_modules)) {
+                                  const subIndex = module.sub_modules.findIndex(sub => sub.id === previousNav.id)
+                                  if (subIndex !== -1) {
+                                    return `${i + 1}.${subIndex + 1} ${previousNav.title}`
+                                  }
+                                }
+                              }
+                              return previousNav.title
+                            }
+                          })()}
+                        </div>
                       </div>
                     </Button>
                   )}
                 </div>
                 <div>
-                  {nextSection && (
+                  {nextNav && (
                     <Button
                       variant="outline"
-                      onClick={() => handleSectionChange(nextSection.id)}
+                      onClick={() => handleSectionChange(nextNav.id)}
                       className="group"
                     >
                       <div className="text-right">
-                        <div className="text-xs text-muted-foreground">Next</div>
-                        <div className="font-medium">{nextSection.title}</div>
+                        <div className="text-xs text-muted-foreground">
+                          Next {nextNav.type === 'submodule' ? 'Submodule' : 'Module'}
+                        </div>
+                        <div className="font-medium">
+                          {(() => {
+                            if (nextNav.type === 'module') {
+                              const moduleIndex = sections.findIndex(s => s.id === nextNav.id)
+                              return `${moduleIndex + 1}. ${nextNav.title}`
+                            } else {
+                              // For submodules, find the parent module and submodule index
+                              for (let i = 0; i < (modules || []).length; i++) {
+                                const module = modules[i]
+                                if (module.sub_modules && Array.isArray(module.sub_modules)) {
+                                  const subIndex = module.sub_modules.findIndex(sub => sub.id === nextNav.id)
+                                  if (subIndex !== -1) {
+                                    return `${i + 1}.${subIndex + 1} ${nextNav.title}`
+                                  }
+                                }
+                              }
+                              return nextNav.title
+                            }
+                          })()}
+                        </div>
                       </div>
                       <ChevronRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
                     </Button>

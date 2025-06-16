@@ -7,6 +7,7 @@ import { AuthPage } from '@/pages/auth/AuthPage'
 import { AdminPage } from '@/pages/admin/AdminPage'
 import { ProfilePage } from '@/pages/profile/ProfilePage'
 import { ResultsPage } from '@/pages/results/ResultsPage'
+import OAuthCallback from '@/pages/oauth-callback'
 
 export const AppRouter = () => {
   return (
@@ -24,6 +25,7 @@ export const AppRouter = () => {
         
         {/* Auth Routes */}
         <Route path="/login" element={<AuthPage />} />
+        <Route path="/oauth-callback" element={<OAuthCallback />} />
         
         {/* User Routes */}
         <Route path="/profile" element={<ProfilePage />} />

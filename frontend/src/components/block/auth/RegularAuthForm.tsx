@@ -4,11 +4,12 @@ import { Input } from '@/components/ui/input'
 import { ArrowLeft } from 'lucide-react'
 import { motion } from 'motion/react'
 import { OAuthProviders } from './OAuthProviders'
+import { handleOAuthLogin } from '@/store/authStore'
+import { toast } from 'sonner'
 
 interface RegularAuthFormProps {
   onBack: () => void
   onSubmit: (data: RegularFormData, authType: 'login' | 'register') => void
-  onOAuthLogin: (provider: string) => void
 }
 
 interface RegularFormData {
@@ -34,7 +35,7 @@ const FloatingElement = ({ children, delay = 0 }: { children: React.ReactNode, d
   </motion.div>
 )
 
-export const RegularAuthForm = ({ onBack, onSubmit, onOAuthLogin }: RegularAuthFormProps) => {
+export const RegularAuthForm = ({ onBack, onSubmit }: RegularAuthFormProps) => {
   const [authType, setAuthType] = useState<'login' | 'register'>('login')
   const [formData, setFormData] = useState<RegularFormData>({
     email: '',
@@ -71,6 +72,19 @@ export const RegularAuthForm = ({ onBack, onSubmit, onOAuthLogin }: RegularAuthF
   const handleAuthTypeChange = (type: 'login' | 'register') => {
     setAuthType(type)
     resetForm()
+  }
+
+  const handleOAuthClick = async (provider: string) => {
+    setIsLoading(true)
+    try {
+      await handleOAuthLogin(provider, 'user')
+      toast.success(`Successfully logged in with ${provider}`)
+    } catch (error: any) {
+      console.error('OAuth login failed:', error)
+      toast.error(error.message || `Failed to login with ${provider}`)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -141,7 +155,7 @@ export const RegularAuthForm = ({ onBack, onSubmit, onOAuthLogin }: RegularAuthF
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.9 }}
           >
-            <OAuthProviders onOAuthLogin={onOAuthLogin} />
+            <OAuthProviders onOAuthLogin={handleOAuthClick} isLoading={isLoading} />
             
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -158,7 +172,7 @@ export const RegularAuthForm = ({ onBack, onSubmit, onOAuthLogin }: RegularAuthF
             className="flex rounded-lg bg-gray-100 p-1 gap-1 mb-6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.0 }}
+            transition={{ delay: 0.9 }}
           >
             <Button
               type="button"
@@ -167,7 +181,7 @@ export const RegularAuthForm = ({ onBack, onSubmit, onOAuthLogin }: RegularAuthF
               className={`flex-1 h-10 text-sm font-medium transition-all ${
                 authType === 'login' 
                   ? 'bg-white shadow-sm text-gray-900' 
-                  : 'bg-transparent text-gray-600 hover:text-gray-900'
+                  : 'bg-neutral-100 text-gray-600 hover:bg-white hover:text-gray-800'
               }`}
             >
               Masuk
@@ -179,7 +193,7 @@ export const RegularAuthForm = ({ onBack, onSubmit, onOAuthLogin }: RegularAuthF
               className={`flex-1 h-10 text-sm font-medium transition-all ${
                 authType === 'register' 
                   ? 'bg-white shadow-sm text-gray-900' 
-                  : 'bg-transparent text-gray-600 hover:text-gray-900'
+                  : 'bg-neutral-100 text-gray-600 hover:bg-white hover:text-gray-800'
               }`}
             >
               Daftar
@@ -192,15 +206,17 @@ export const RegularAuthForm = ({ onBack, onSubmit, onOAuthLogin }: RegularAuthF
             className="space-y-4"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.1 }}
+            exit={{ opacity: 0, y: -30 }}
+            transition={{ delay: 0.3, duration: 0.3 }}
+            key={authType}
           >
             {authType === 'register' && (
               <motion.div 
                 className="space-y-2"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 1.2 }}
-                whileHover={{ x: 5 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ delay: 0.1, duration: 0.3 }}
               >
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700">
                   Nama Lengkap
@@ -226,8 +242,7 @@ export const RegularAuthForm = ({ onBack, onSubmit, onOAuthLogin }: RegularAuthF
               className="space-y-2"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: authType === 'register' ? 1.3 : 1.2 }}
-              whileHover={{ x: 5 }}
+              transition={{ delay: authType === 'register' ? 0.2 : 0.1 }}
             >
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email
@@ -252,8 +267,7 @@ export const RegularAuthForm = ({ onBack, onSubmit, onOAuthLogin }: RegularAuthF
               className="space-y-2"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: authType === 'register' ? 1.4 : 1.3 }}
-              whileHover={{ x: 5 }}
+              transition={{ delay: authType === 'register' ? 0.3 : 0.2 }}
             >
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Password
@@ -280,8 +294,8 @@ export const RegularAuthForm = ({ onBack, onSubmit, onOAuthLogin }: RegularAuthF
                 className="space-y-2"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 1.5 }}
-                whileHover={{ x: 5 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ delay: 0.4, duration: 0.3 }}
               >
                 <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
                   Konfirmasi Password
@@ -306,7 +320,7 @@ export const RegularAuthForm = ({ onBack, onSubmit, onOAuthLogin }: RegularAuthF
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: authType === 'register' ? 1.6 : 1.4 }}
+              transition={{ delay: authType === 'register' ? 0.5 : 0.3 }}
             >
               <motion.div
                 whileHover={{ scale: 1.02 }}
@@ -316,7 +330,7 @@ export const RegularAuthForm = ({ onBack, onSubmit, onOAuthLogin }: RegularAuthF
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full h-11 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transition-all duration-300"
+                  className="w-full h-11 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 transition-all duration-300 shadow-lg hover:shadow-xl"
                   size="lg"
                 >
                   {isLoading ? (
@@ -403,7 +417,9 @@ export const RegularAuthForm = ({ onBack, onSubmit, onOAuthLogin }: RegularAuthF
           className="relative z-10 text-center max-w-md"
           initial={{ y: 50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
+          exit={{ y: -50, opacity: 0 }}
           transition={{ delay: 0.4, duration: 0.6 }}
+          key={authType}
         >
           <FloatingElement delay={0}>
             <motion.div 
@@ -415,7 +431,11 @@ export const RegularAuthForm = ({ onBack, onSubmit, onOAuthLogin }: RegularAuthF
               }}
             >
               <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                {authType === 'login' ? (
+                  <path fillRule="evenodd" d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm7.707 3.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                ) : (
+                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                )}
               </svg>
             </motion.div>
           </FloatingElement>
@@ -429,16 +449,82 @@ export const RegularAuthForm = ({ onBack, onSubmit, onOAuthLogin }: RegularAuthF
             {authType === 'login' ? 'Selamat Datang Kembali!' : 'Bergabung dengan Platform'}
           </motion.h2>
           <motion.p 
-            className="text-blue-100 text-lg"
+            className="text-blue-100 text-lg mb-6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
           >
             {authType === 'login' 
-              ? 'Masuk ke akun Anda untuk melanjutkan pembelajaran'
-              : 'Daftar akun dan ajukan akses untuk menggunakan platform pembelajaran AI'
+              ? 'Masuk ke akun Anda untuk melanjutkan pembelajaran dan mengakses fitur-fitur menarik'
+              : 'Daftar akun baru dan ajukan akses untuk menggunakan platform pembelajaran AI terdepan'
             }
           </motion.p>
+          
+          {/* Features List */}
+          <motion.div 
+            className="space-y-3"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7 }}
+          >
+            {authType === 'login' ? (
+              // Login benefits
+              <>
+                <div className="flex items-center gap-3 text-blue-100">
+                  <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                    <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <span className="font-medium">Akses semua progress Anda</span>
+                </div>
+                <div className="flex items-center gap-3 text-blue-100">
+                  <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                    <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <span className="font-medium">Lanjutkan quiz terakhir</span>
+                </div>
+                <div className="flex items-center gap-3 text-blue-100">
+                  <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                    <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <span className="font-medium">Sinkronisasi lintas perangkat</span>
+                </div>
+              </>
+            ) : (
+              // Register benefits
+              <>
+                <div className="flex items-center gap-3 text-blue-100">
+                  <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                    <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <span className="font-medium">Time Quiz unlimited</span>
+                </div>
+                <div className="flex items-center gap-3 text-blue-100">
+                  <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                    <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <span className="font-medium">Akses dokumentasi lengkap</span>
+                </div>
+                <div className="flex items-center gap-3 text-blue-100">
+                  <div className="w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center">
+                    <svg className="w-3 h-3 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <span className="font-medium">Mock Test (perlu persetujuan)</span>
+                </div>
+              </>
+            )}
+          </motion.div>
         </motion.div>
       </motion.div>
     </motion.div>

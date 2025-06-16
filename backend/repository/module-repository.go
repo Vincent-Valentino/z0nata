@@ -62,7 +62,10 @@ func (r *moduleRepository) GetAllModules(ctx context.Context, req *models.GetMod
 	opts := options.Find()
 	opts.SetSkip(int64((req.Page - 1) * req.Limit))
 	opts.SetLimit(int64(req.Limit))
-	opts.SetSort(bson.D{{Key: "updated_at", Value: -1}}) // Sort by updated_at descending
+	opts.SetSort(bson.D{
+		{Key: "order", Value: 1},      // Sort by order ascending (1, 2, 3...)
+		{Key: "created_at", Value: 1}, // Then by created_at ascending (oldest first)
+	})
 
 	// Find modules
 	cursor, err := r.moduleCollection.Find(ctx, filter, opts)
@@ -148,7 +151,10 @@ func (r *moduleRepository) GetPublishedModules(ctx context.Context, page, limit 
 	opts := options.Find()
 	opts.SetSkip(int64((page - 1) * limit))
 	opts.SetLimit(int64(limit))
-	opts.SetSort(bson.D{{Key: "updated_at", Value: -1}}) // Sort by updated_at descending
+	opts.SetSort(bson.D{
+		{Key: "order", Value: 1},      // Sort by order ascending (1, 2, 3...)
+		{Key: "created_at", Value: 1}, // Then by created_at ascending (oldest first)
+	})
 
 	// Find published modules
 	cursor, err := r.moduleCollection.Find(ctx, filter, opts)

@@ -20,6 +20,11 @@ func NewAuthMiddleware(jwtManager *utils.JWTManager) *AuthMiddleware {
 	}
 }
 
+// GetJWTManager returns the JWT manager instance
+func (a *AuthMiddleware) GetJWTManager() *utils.JWTManager {
+	return a.jwtManager
+}
+
 // RequireAuth validates JWT token and sets user context
 func (a *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {

@@ -14,31 +14,45 @@ import (
 )
 
 func ConnectMongoDB(config models.DatabaseConfig) (*mongo.Database, error) {
-	// Set client options
+	// Set client options optimized for MongoDB Atlas
 	clientOptions := options.Client().
 		ApplyURI(config.URI).
 		SetMaxPoolSize(config.MaxPoolSize).
-		SetMaxConnIdleTime(30 * time.Minute).
-		SetServerSelectionTimeout(5 * time.Second)
+		SetMinPoolSize(5).                           // Minimum connections for Atlas
+		SetMaxConnIdleTime(30 * time.Minute).        // Idle connection timeout
+		SetServerSelectionTimeout(10 * time.Second). // Increased for Atlas
+		SetConnectTimeout(10 * time.Second).         // Connection timeout for Atlas
+		SetSocketTimeout(30 * time.Second).          // Socket timeout
+		SetHeartbeatInterval(10 * time.Second).      // Heartbeat for Atlas
+		SetRetryWrites(true).                        // Enable retry writes (Atlas default)
+		SetRetryReads(true)                          // Enable retry reads
 
-	// Connect to MongoDB
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// Connect to MongoDB Atlas
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	log.Println("Connecting to MongoDB Atlas...")
 	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to MongoDB: %w", err)
+		return nil, fmt.Errorf("failed to connect to MongoDB Atlas: %w", err)
 	}
 
-	// Test the connection
+	// Test the connection with ping
+	log.Println("Testing MongoDB Atlas connection...")
 	err = client.Ping(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to ping MongoDB: %w", err)
+		client.Disconnect(ctx)
+		return nil, fmt.Errorf("failed to ping MongoDB Atlas: %w", err)
 	}
 
-	log.Printf("Successfully connected to MongoDB database: %s", config.Name)
+	log.Printf("Successfully connected to MongoDB Atlas database: %s", config.Name)
 
 	db := client.Database(config.Name)
+
+	// Fix existing indexes (drop and recreate with sparse option)
+	if err := fixExistingIndexes(ctx, db); err != nil {
+		log.Printf("Warning: Failed to fix existing indexes: %v", err)
+	}
 
 	// Create indexes
 	if err := createIndexes(ctx, db); err != nil {
@@ -48,14 +62,33 @@ func ConnectMongoDB(config models.DatabaseConfig) (*mongo.Database, error) {
 	return db, nil
 }
 
+func fixExistingIndexes(ctx context.Context, db *mongo.Database) error {
+	collections := []string{"users", "mahasiswa", "admins"}
+
+	for _, collectionName := range collections {
+		collection := db.Collection(collectionName)
+
+		// Try to drop the existing email index if it exists
+		_, err := collection.Indexes().DropOne(ctx, "email_1")
+		if err != nil {
+			// Index might not exist, which is fine
+			log.Printf("Note: Could not drop email index for %s collection (might not exist): %v", collectionName, err)
+		} else {
+			log.Printf("Dropped existing email index for %s collection", collectionName)
+		}
+	}
+
+	return nil
+}
+
 func createIndexes(ctx context.Context, db *mongo.Database) error {
 	// Users collection indexes
 	usersCollection := db.Collection("users")
 
-	// Email index (unique)
+	// Email index (unique and sparse - allows multiple null values)
 	emailIndex := mongo.IndexModel{
 		Keys:    bson.D{{Key: "email", Value: 1}},
-		Options: options.Index().SetUnique(true),
+		Options: options.Index().SetUnique(true).SetSparse(true),
 	}
 
 	// OAuth ID indexes
@@ -69,8 +102,8 @@ func createIndexes(ctx context.Context, db *mongo.Database) error {
 		Options: options.Index().SetSparse(true),
 	}
 
-	appleIDIndex := mongo.IndexModel{
-		Keys:    bson.D{{Key: "apple_id", Value: 1}},
+	xIDIndex := mongo.IndexModel{
+		Keys:    bson.D{{Key: "x_id", Value: 1}},
 		Options: options.Index().SetSparse(true),
 	}
 
@@ -105,7 +138,7 @@ func createIndexes(ctx context.Context, db *mongo.Database) error {
 		emailIndex,
 		googleIDIndex,
 		facebookIDIndex,
-		appleIDIndex,
+		xIDIndex,
 		githubIDIndex,
 		resetTokenIndex,
 		verificationTokenIndex,
@@ -121,10 +154,10 @@ func createIndexes(ctx context.Context, db *mongo.Database) error {
 	// Mahasiswa collection indexes
 	mahasiswaCollection := db.Collection("mahasiswa")
 
-	// Email index (unique)
+	// Email index (unique and sparse - allows multiple null values)
 	mahasiswaEmailIndex := mongo.IndexModel{
 		Keys:    bson.D{{Key: "email", Value: 1}},
-		Options: options.Index().SetUnique(true),
+		Options: options.Index().SetUnique(true).SetSparse(true),
 	}
 
 	// NIM index (unique)
@@ -144,8 +177,8 @@ func createIndexes(ctx context.Context, db *mongo.Database) error {
 		Options: options.Index().SetSparse(true),
 	}
 
-	mahasiswaAppleIDIndex := mongo.IndexModel{
-		Keys:    bson.D{{Key: "apple_id", Value: 1}},
+	mahasiswaXIDIndex := mongo.IndexModel{
+		Keys:    bson.D{{Key: "x_id", Value: 1}},
 		Options: options.Index().SetSparse(true),
 	}
 
@@ -175,7 +208,7 @@ func createIndexes(ctx context.Context, db *mongo.Database) error {
 		nimIndex,
 		mahasiswaGoogleIDIndex,
 		mahasiswaFacebookIDIndex,
-		mahasiswaAppleIDIndex,
+		mahasiswaXIDIndex,
 		mahasiswaGithubIDIndex,
 		mahasiswaResetTokenIndex,
 		mahasiswaVerificationTokenIndex,
@@ -190,10 +223,10 @@ func createIndexes(ctx context.Context, db *mongo.Database) error {
 	// Admin collection indexes
 	adminCollection := db.Collection("admins")
 
-	// Email index (unique)
+	// Email index (unique and sparse - allows multiple null values)
 	adminEmailIndex := mongo.IndexModel{
 		Keys:    bson.D{{Key: "email", Value: 1}},
-		Options: options.Index().SetUnique(true),
+		Options: options.Index().SetUnique(true).SetSparse(true),
 	}
 
 	// OAuth ID indexes for admin
@@ -207,8 +240,8 @@ func createIndexes(ctx context.Context, db *mongo.Database) error {
 		Options: options.Index().SetSparse(true),
 	}
 
-	adminAppleIDIndex := mongo.IndexModel{
-		Keys:    bson.D{{Key: "apple_id", Value: 1}},
+	adminXIDIndex := mongo.IndexModel{
+		Keys:    bson.D{{Key: "x_id", Value: 1}},
 		Options: options.Index().SetSparse(true),
 	}
 
@@ -237,7 +270,7 @@ func createIndexes(ctx context.Context, db *mongo.Database) error {
 		adminEmailIndex,
 		adminGoogleIDIndex,
 		adminFacebookIDIndex,
-		adminAppleIDIndex,
+		adminXIDIndex,
 		adminGithubIDIndex,
 		adminResetTokenIndex,
 		adminVerificationTokenIndex,

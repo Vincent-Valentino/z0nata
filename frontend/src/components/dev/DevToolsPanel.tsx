@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useAuthStore, loginAsAdminDirect, loginAsStudentDirect, getAdminUser, getStudentUser } from '@/store/authStore'
+import { useAuthStore, loginAsAdminDirect, loginAsStudentDirect, getAdminUser, getStudentUser, handleOAuthLogin } from '@/store/authStore'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
+
 import { 
   ChevronUp, 
   ChevronDown, 
@@ -22,7 +23,8 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  Database
+  Database,
+  Globe
 } from 'lucide-react'
 
 interface DevPanelTab {
@@ -39,12 +41,39 @@ export const DevToolsPanel = () => {
   const [apiTestResult, setApiTestResult] = useState<any>(null)
   const [isTestingAPI, setIsTestingAPI] = useState(false)
   const [copiedToken, setCopiedToken] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState<string>('All')
+  const [authTestResult, setAuthTestResult] = useState<any>(null)
+  const [isTestingAuth, setIsTestingAuth] = useState(false)
 
   const tabs: DevPanelTab[] = [
     { id: 'auth', label: 'Auth', icon: Shield },
     { id: 'api', label: 'API Test', icon: TestTube },
+    { id: 'oauth', label: 'OAuth', icon: Globe },
     { id: 'system', label: 'System', icon: Monitor },
     { id: 'settings', label: 'Settings', icon: Settings },
+  ]
+
+  const apiEndpoints = [
+    // Admin endpoints
+    { label: 'Questions List', endpoint: '/admin/questions', method: 'GET', category: 'Admin' },
+    { label: 'Question Stats', endpoint: '/admin/questions/stats', method: 'GET', category: 'Admin' },
+    { label: 'Module Stats', endpoint: '/admin/modules/stats', method: 'GET', category: 'Admin' },
+    { label: 'User Stats', endpoint: '/admin/users/stats', method: 'GET', category: 'Admin' },
+    { label: 'All Users', endpoint: '/admin/users', method: 'GET', category: 'Admin' },
+    
+    // User endpoints
+    { label: 'User Profile', endpoint: '/user/profile', method: 'GET', category: 'User' },
+    { label: 'Change Password', endpoint: '/user/change-password', method: 'POST', category: 'User' },
+    
+    // Auth endpoints
+    { label: 'Refresh Token', endpoint: '/auth/refresh', method: 'POST', category: 'Auth' },
+    { label: 'Logout', endpoint: '/auth/logout', method: 'POST', category: 'Auth' },
+    { label: 'Google OAuth URL', endpoint: '/auth/oauth/google/url?user_type=mahasiswa', method: 'GET', category: 'Auth' },
+    { label: 'X OAuth URL', endpoint: '/auth/oauth/x/url?user_type=mahasiswa', method: 'GET', category: 'Auth' },
+    
+    // System endpoints
+    { label: 'Health Check', endpoint: '/health', method: 'GET', category: 'System' },
+    { label: 'API Version', endpoint: '/api/v1', method: 'GET', category: 'System' },
   ]
 
   const adminUser = getAdminUser()
@@ -64,10 +93,36 @@ export const DevToolsPanel = () => {
   ]
 
   const handleQuickLogin = async (userType: 'admin' | 'student') => {
-    if (userType === 'admin') {
-      await loginAsAdminDirect()
-    } else {
-      await loginAsStudentDirect()
+    console.log(`🔄 Starting ${userType} login...`)
+    try {
+      if (userType === 'admin') {
+        const success = await loginAsAdminDirect()
+        if (success) {
+          console.log('✅ Admin login successful')
+          // Test API call immediately after login
+          setTimeout(async () => {
+            try {
+              const token = useAuthStore.getState().token
+              console.log('🧪 Testing API with token:', token ? `${token.slice(0, 20)}...` : 'null')
+              const result = await api.get('/admin/questions/stats')
+              console.log('✅ API test successful:', result)
+            } catch (error) {
+              console.error('❌ API test failed:', error)
+            }
+          }, 500)
+        } else {
+          console.warn('⚠️ Admin login failed, using fallback')
+        }
+      } else {
+        const success = await loginAsStudentDirect()
+        if (success) {
+          console.log('✅ Student login successful')
+        } else {
+          console.warn('⚠️ Student login failed, using fallback')
+        }
+      }
+    } catch (error) {
+      console.error(`❌ ${userType} login error:`, error)
     }
   }
 
@@ -120,18 +175,54 @@ export const DevToolsPanel = () => {
     }
   }
 
-  const apiEndpoints = [
-    { label: 'Questions List', endpoint: '/admin/questions', method: 'GET' },
-    { label: 'Question Stats', endpoint: '/admin/questions/stats', method: 'GET' },
-    { label: 'User Profile', endpoint: '/user/profile', method: 'GET' },
-    { label: 'Health Check', endpoint: '/health', method: 'GET' },
+  const testOAuthProvider = async (provider: string, userType: 'mahasiswa' | 'admin' = 'mahasiswa') => {
+    setIsTestingAuth(true)
+    setAuthTestResult(null)
+    
+    try {
+      const startTime = Date.now()
+      await handleOAuthLogin(provider, userType)
+      const endTime = Date.now()
+      const duration = endTime - startTime
+      
+      setAuthTestResult({
+        success: true,
+        provider,
+        userType,
+        duration,
+        message: `Successfully logged in with ${provider} as ${userType}`
+      })
+    } catch (error: any) {
+      setAuthTestResult({
+        success: false,
+        provider,
+        userType,
+        error: error.message,
+        message: `Failed to login with ${provider}: ${error.message}`
+      })
+    } finally {
+      setIsTestingAuth(false)
+    }
+  }
+
+  const filteredEndpoints = selectedCategory === 'All' 
+    ? apiEndpoints 
+    : apiEndpoints.filter(endpoint => endpoint.category === selectedCategory)
+
+  const categories = ['All', ...Array.from(new Set(apiEndpoints.map(e => e.category)))]
+
+  const oauthProviders = [
+    { id: 'google', name: 'Google', icon: '🔍' },
+    { id: 'facebook', name: 'Facebook', icon: '📘' },
+    { id: 'x', name: 'X / Twitter', icon: '🐦' },
+    { id: 'github', name: 'GitHub', icon: '🐙' },
   ]
 
   return (
     <div className={cn(
       "fixed bottom-4 right-4 z-50 transition-all duration-300 ease-in-out",
-      "w-100 bg-background border border-border rounded-lg shadow-2xl",
-      isExpanded ? "h-96" : "h-12"
+      "w-120 bg-background border border-border rounded-lg shadow-2xl",
+      isExpanded ? "h-100" : "h-12"
     )}>
       {/* Header */}
       <div 
@@ -156,7 +247,7 @@ export const DevToolsPanel = () => {
       {isExpanded && (
         <div className="p-3 pt-0 h-80 overflow-hidden">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
-            <TabsList className="grid w-full grid-cols-4 mb-3">
+            <TabsList className="grid w-full grid-cols-5 mb-3">
               {tabs.map((tab) => (
                 <TabsTrigger 
                   key={tab.id} 
@@ -261,8 +352,23 @@ export const DevToolsPanel = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <div className="grid grid-cols-1 gap-2">
-                    {apiEndpoints.map((endpoint, index) => (
+                  {/* Category Filter */}
+                  <div className="flex gap-1 mb-2 overflow-x-auto">
+                    {categories.map((category) => (
+                      <Button
+                        key={category}
+                        onClick={() => setSelectedCategory(category)}
+                        variant={selectedCategory === category ? "default" : "outline"}
+                        size="sm"
+                        className="text-xs whitespace-nowrap"
+                      >
+                        {category}
+                      </Button>
+                    ))}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto">
+                    {filteredEndpoints.map((endpoint, index) => (
                       <Button
                         key={index}
                         onClick={() => testAPIEndpoint(endpoint.endpoint, endpoint.method)}
@@ -276,7 +382,10 @@ export const DevToolsPanel = () => {
                         ) : (
                           <Activity className="w-3 h-3 mr-2" />
                         )}
-                        {endpoint.method} {endpoint.label}
+                        <Badge variant="secondary" className="text-xs mr-2">
+                          {endpoint.method}
+                        </Badge>
+                        {endpoint.label}
                       </Button>
                     ))}
                   </div>
@@ -312,6 +421,97 @@ export const DevToolsPanel = () => {
                           Error: {apiTestResult.error}
                         </pre>
                       )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            {/* OAuth Test Tab */}
+            <TabsContent value="oauth" className="space-y-3 h-60 overflow-y-auto">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Globe className="w-4 h-4" />
+                    OAuth Testing
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Test OAuth login with different providers
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="grid grid-cols-1 gap-2">
+                    {oauthProviders.map((provider) => (
+                      <div key={provider.id} className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium flex items-center gap-2">
+                            <span>{provider.icon}</span>
+                            {provider.name}
+                          </span>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            onClick={() => testOAuthProvider(provider.id, 'mahasiswa')}
+                            disabled={isTestingAuth}
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 text-xs"
+                          >
+                            {isTestingAuth ? (
+                              <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                            ) : (
+                              <User className="w-3 h-3 mr-1" />
+                            )}
+                            Student
+                          </Button>
+                          <Button
+                            onClick={() => testOAuthProvider(provider.id, 'admin')}
+                            disabled={isTestingAuth}
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 text-xs"
+                          >
+                            {isTestingAuth ? (
+                              <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                            ) : (
+                              <Shield className="w-3 h-3 mr-1" />
+                            )}
+                            Admin
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {authTestResult && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      {authTestResult.success ? (
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-red-500" />
+                      )}
+                      OAuth Test Result
+                      {authTestResult.duration && (
+                        <Badge variant="outline" className="text-xs ml-auto">
+                          <Clock className="w-3 h-3 mr-1" />
+                          {authTestResult.duration}ms
+                        </Badge>
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="bg-muted rounded-md p-2 text-xs">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge variant="outline">{authTestResult.provider}</Badge>
+                        <Badge variant="outline">{authTestResult.userType}</Badge>
+                      </div>
+                      <p className={authTestResult.success ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
+                        {authTestResult.message}
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
@@ -421,12 +621,49 @@ export const DevToolsPanel = () => {
                     Reload Page
                   </Button>
                   <Button
-                    onClick={() => setApiTestResult(null)}
+                    onClick={() => {
+                      setApiTestResult(null)
+                      setAuthTestResult(null)
+                    }}
                     variant="outline"
                     size="sm"
                     className="w-full text-xs"
                   >
-                    Clear Test Results
+                    Clear All Test Results
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      try {
+                        const response = await fetch('http://localhost:8080/api/v1/auth/oauth/google/url?user_type=mahasiswa')
+                        const data = await response.json()
+                        console.log('OAuth URL test:', data)
+                        alert(`OAuth URL: ${data.auth_url}`)
+                      } catch (error) {
+                        console.error('OAuth URL test failed:', error)
+                        alert('OAuth URL test failed')
+                      }
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-xs"
+                  >
+                    Test OAuth URL Generation
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      const token = useAuthStore.getState().token
+                      if (token) {
+                        console.log('Current JWT Token:', token)
+                        console.log('Token payload:', JSON.parse(atob(token.split('.')[1])))
+                      } else {
+                        console.log('No token available')
+                      }
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-xs"
+                  >
+                    Debug JWT Token
                   </Button>
                 </CardContent>
               </Card>

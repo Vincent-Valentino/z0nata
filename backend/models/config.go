@@ -36,7 +36,7 @@ type JWTConfig struct {
 type OAuthConfig struct {
 	Google   OAuthProvider `json:"google"`
 	Facebook OAuthProvider `json:"facebook"`
-	Apple    OAuthProvider `json:"apple"`
+	X        OAuthProvider `json:"x"`
 	Github   OAuthProvider `json:"github"`
 }
 

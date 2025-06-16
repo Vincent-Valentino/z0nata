@@ -14,6 +14,7 @@ import (
 	"backend/utils"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/facebook"
 	"golang.org/x/oauth2/github"
@@ -64,43 +65,53 @@ func NewUserService(
 }
 
 func (s *userService) initOAuthConfigs() {
+	s.oauthConfigs = make(map[string]*oauth2.Config)
+
 	// Google OAuth
-	s.oauthConfigs["google"] = &oauth2.Config{
-		ClientID:     s.config.OAuth.Google.ClientID,
-		ClientSecret: s.config.OAuth.Google.ClientSecret,
-		RedirectURL:  s.config.OAuth.Google.RedirectURL,
-		Scopes:       s.config.OAuth.Google.Scopes,
-		Endpoint:     google.Endpoint,
+	if s.config.OAuth.Google.ClientID != "" {
+		s.oauthConfigs["google"] = &oauth2.Config{
+			ClientID:     s.config.OAuth.Google.ClientID,
+			ClientSecret: s.config.OAuth.Google.ClientSecret,
+			RedirectURL:  s.config.OAuth.Google.RedirectURL,
+			Scopes:       s.config.OAuth.Google.Scopes,
+			Endpoint:     google.Endpoint,
+		}
 	}
 
 	// Facebook OAuth
-	s.oauthConfigs["facebook"] = &oauth2.Config{
-		ClientID:     s.config.OAuth.Facebook.ClientID,
-		ClientSecret: s.config.OAuth.Facebook.ClientSecret,
-		RedirectURL:  s.config.OAuth.Facebook.RedirectURL,
-		Scopes:       s.config.OAuth.Facebook.Scopes,
-		Endpoint:     facebook.Endpoint,
+	if s.config.OAuth.Facebook.ClientID != "" {
+		s.oauthConfigs["facebook"] = &oauth2.Config{
+			ClientID:     s.config.OAuth.Facebook.ClientID,
+			ClientSecret: s.config.OAuth.Facebook.ClientSecret,
+			RedirectURL:  s.config.OAuth.Facebook.RedirectURL,
+			Scopes:       s.config.OAuth.Facebook.Scopes,
+			Endpoint:     facebook.Endpoint,
+		}
 	}
 
-	// Apple OAuth (custom endpoint since golang.org/x/oauth2/apple doesn't exist)
-	s.oauthConfigs["apple"] = &oauth2.Config{
-		ClientID:     s.config.OAuth.Apple.ClientID,
-		ClientSecret: s.config.OAuth.Apple.ClientSecret,
-		RedirectURL:  s.config.OAuth.Apple.RedirectURL,
-		Scopes:       s.config.OAuth.Apple.Scopes,
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  "https://appleid.apple.com/auth/authorize",
-			TokenURL: "https://appleid.apple.com/auth/token",
-		},
+	// X (Twitter) OAuth
+	if s.config.OAuth.X.ClientID != "" {
+		s.oauthConfigs["x"] = &oauth2.Config{
+			ClientID:     s.config.OAuth.X.ClientID,
+			ClientSecret: s.config.OAuth.X.ClientSecret,
+			RedirectURL:  s.config.OAuth.X.RedirectURL,
+			Scopes:       s.config.OAuth.X.Scopes,
+			Endpoint: oauth2.Endpoint{
+				AuthURL:  "https://x.com/i/oauth2/authorize",
+				TokenURL: "https://api.x.com/2/oauth2/token",
+			},
+		}
 	}
 
 	// GitHub OAuth
-	s.oauthConfigs["github"] = &oauth2.Config{
-		ClientID:     s.config.OAuth.Github.ClientID,
-		ClientSecret: s.config.OAuth.Github.ClientSecret,
-		RedirectURL:  s.config.OAuth.Github.RedirectURL,
-		Scopes:       s.config.OAuth.Github.Scopes,
-		Endpoint:     github.Endpoint,
+	if s.config.OAuth.Github.ClientID != "" {
+		s.oauthConfigs["github"] = &oauth2.Config{
+			ClientID:     s.config.OAuth.Github.ClientID,
+			ClientSecret: s.config.OAuth.Github.ClientSecret,
+			RedirectURL:  s.config.OAuth.Github.RedirectURL,
+			Scopes:       s.config.OAuth.Github.Scopes,
+			Endpoint:     github.Endpoint,
+		}
 	}
 }
 
@@ -153,14 +164,19 @@ func (s *userService) Register(ctx context.Context, req *models.RegisterRequest)
 				PasswordHash:      hashedPassword,
 				EmailVerified:     false,
 				VerificationToken: verificationToken,
+				UserType:          models.UserTypeMahasiswa,
+				Status:            models.UserStatusActive, // Mahasiswa are auto-approved
 			},
 			NIM:     req.NIM,
-			Status:  "active",
 			Faculty: req.Faculty,
 			Major:   req.Major,
 		}
 
 		if err := s.userRepo.CreateMahasiswa(ctx, mahasiswa); err != nil {
+			// Check if it's a duplicate key error
+			if mongo.IsDuplicateKeyError(err) {
+				return nil, fmt.Errorf("user with this email or OAuth account already exists")
+			}
 			return nil, fmt.Errorf("failed to create mahasiswa: %w", err)
 		}
 
@@ -202,6 +218,8 @@ func (s *userService) Register(ctx context.Context, req *models.RegisterRequest)
 				PasswordHash:      hashedPassword,
 				EmailVerified:     false,
 				VerificationToken: verificationToken,
+				UserType:          models.UserTypeAdmin,
+				Status:            models.UserStatusActive, // Admins are auto-approved
 			},
 			IsAdmin:     true,
 			Permissions: []string{"read", "write", "delete"},
@@ -236,6 +254,52 @@ func (s *userService) Register(ctx context.Context, req *models.RegisterRequest)
 
 		return &models.AuthResponse{
 			User:         admin,
+			AccessToken:  accessToken,
+			RefreshToken: refreshToken,
+			ExpiresIn:    int64(s.jwtManager.GetAccessTokenExpiry().Seconds()),
+		}, nil
+
+	} else if req.UserType == "user" {
+		// Create regular user (non-mahasiswa)
+		user := &models.User{
+			FullName:          req.FullName,
+			Email:             req.Email,
+			PasswordHash:      hashedPassword,
+			EmailVerified:     false,
+			VerificationToken: verificationToken,
+			UserType:          models.UserTypeExternal,  // Use external type for regular users
+			Status:            models.UserStatusPending, // External users need approval
+		}
+
+		if err := s.userRepo.Create(ctx, user); err != nil {
+			return nil, fmt.Errorf("failed to create user: %w", err)
+		}
+
+		// Send verification email
+		verifyURL := fmt.Sprintf("%s/verify-email", s.config.Server.AllowedOrigins[0])
+		if err := s.emailService.SendVerificationEmail(req.Email, verificationToken, verifyURL); err != nil {
+			// Log error but don't fail registration
+			fmt.Printf("Failed to send verification email: %v\n", err)
+		}
+
+		// Generate tokens
+		accessToken, err := s.jwtManager.GenerateAccessToken(user.ID, user.Email, "user", false)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate access token: %w", err)
+		}
+
+		refreshToken, err := s.jwtManager.GenerateRefreshToken(user.ID, user.Email, false)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate refresh token: %w", err)
+		}
+
+		// Store refresh token
+		if err := s.userRepo.SetRefreshToken(ctx, user.ID, refreshToken); err != nil {
+			return nil, fmt.Errorf("failed to store refresh token: %w", err)
+		}
+
+		return &models.AuthResponse{
+			User:         user,
 			AccessToken:  accessToken,
 			RefreshToken: refreshToken,
 			ExpiresIn:    int64(s.jwtManager.GetAccessTokenExpiry().Seconds()),
@@ -531,8 +595,8 @@ func (s *userService) OAuthLogin(ctx context.Context, req *models.OAuthRequest) 
 		userInfo, err = s.getFacebookUserInfo(ctx, config, req.Code)
 	case "github":
 		userInfo, err = s.getGithubUserInfo(ctx, config, req.Code)
-	case "apple":
-		userInfo, err = s.getAppleUserInfo(ctx, config, req.IDToken)
+	case "x":
+		userInfo, err = s.getXUserInfo(ctx, config, req.Code)
 	default:
 		return nil, errors.New("unsupported OAuth provider")
 	}
@@ -547,8 +611,42 @@ func (s *userService) OAuthLogin(ctx context.Context, req *models.OAuthRequest) 
 	picture, _ := userInfo["picture"].(string)
 	oauthID, _ := userInfo["id"].(string)
 
-	if email == "" || oauthID == "" {
-		return nil, errors.New("insufficient user information from OAuth provider")
+	// Validate required fields
+	if oauthID == "" {
+		return nil, errors.New("OAuth ID is required from provider")
+	}
+
+	// Handle missing email (some providers like X/Twitter might not provide email)
+	if email == "" {
+		// Generate a more meaningful email based on provider and user info
+		if name != "" {
+			// Use name-based email if name is available
+			cleanName := strings.ToLower(strings.ReplaceAll(name, " ", "."))
+			email = fmt.Sprintf("%s@%s.oauth", cleanName, req.Provider)
+		} else {
+			// Fallback to OAuth ID
+			email = fmt.Sprintf("user_%s@%s.oauth", oauthID, req.Provider)
+		}
+	}
+
+	// Handle missing name
+	if name == "" {
+		// Try to extract name from email
+		if strings.Contains(email, "@") {
+			emailParts := strings.Split(email, "@")
+			if len(emailParts) > 0 {
+				namePart := emailParts[0]
+				// Replace dots and underscores with spaces and title case
+				namePart = strings.ReplaceAll(namePart, ".", " ")
+				namePart = strings.ReplaceAll(namePart, "_", " ")
+				name = strings.Title(namePart)
+			}
+		}
+
+		// Final fallback
+		if name == "" {
+			name = fmt.Sprintf("%s User", strings.Title(req.Provider))
+		}
 	}
 
 	// Check if user exists with OAuth ID
@@ -705,32 +803,40 @@ func (s *userService) getGithubUserInfo(ctx context.Context, config *oauth2.Conf
 	return userInfo, nil
 }
 
-func (s *userService) getAppleUserInfo(ctx context.Context, config *oauth2.Config, idToken string) (map[string]interface{}, error) {
-	// For Apple, we would need to validate the ID token
-	// This is a simplified implementation - in production, you should validate the JWT
-	parts := strings.Split(idToken, ".")
-	if len(parts) != 3 {
-		return nil, errors.New("invalid ID token format")
-	}
-
-	// Decode the payload (this is a simplified example)
-	// In production, you should properly validate the JWT signature
-	payload := parts[1]
-	// Add padding if necessary
-	for len(payload)%4 != 0 {
-		payload += "="
-	}
-
-	decoded, err := utils.GenerateRandomToken(16) // Placeholder
+func (s *userService) getXUserInfo(ctx context.Context, config *oauth2.Config, code string) (map[string]interface{}, error) {
+	token, err := config.Exchange(ctx, code)
 	if err != nil {
 		return nil, err
 	}
 
-	// This should be replaced with actual JWT decoding
+	client := config.Client(ctx, token)
+	resp, err := client.Get("https://api.x.com/2/users/me?user.fields=id,username,name,profile_image_url")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var response map[string]interface{}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, err
+	}
+
+	// Extract user data from X API response
+	data, ok := response["data"].(map[string]interface{})
+	if !ok {
+		return nil, errors.New("invalid response format from X API")
+	}
+
 	userInfo := map[string]interface{}{
-		"id":    decoded,
-		"email": "user@example.com", // Should be extracted from the validated JWT
-		"name":  "Apple User",       // Should be extracted from the validated JWT
+		"id":      data["id"],
+		"name":    data["name"],
+		"email":   data["username"].(string) + "@x.local", // X doesn't provide email by default
+		"picture": data["profile_image_url"],
 	}
 
 	return userInfo, nil
@@ -797,8 +903,8 @@ func (s *userService) linkOAuthAccount(ctx context.Context, user *models.User, p
 		updates["google_id"] = oauthID
 	case "facebook":
 		updates["facebook_id"] = oauthID
-	case "apple":
-		updates["apple_id"] = oauthID
+	case "x":
+		updates["x_id"] = oauthID
 	case "github":
 		updates["github_id"] = oauthID
 	}
@@ -818,8 +924,9 @@ func (s *userService) createOAuthUser(ctx context.Context, email, name, picture,
 				Email:          email,
 				EmailVerified:  true, // OAuth emails are pre-verified
 				ProfilePicture: picture,
+				UserType:       models.UserTypeMahasiswa,
+				Status:         models.UserStatusActive,
 			},
-			Status: "active",
 		}
 
 		// Set OAuth ID
@@ -828,15 +935,21 @@ func (s *userService) createOAuthUser(ctx context.Context, email, name, picture,
 			mahasiswa.GoogleID = oauthID
 		case "facebook":
 			mahasiswa.FacebookID = oauthID
-		case "apple":
-			mahasiswa.AppleID = oauthID
+		case "x":
+			mahasiswa.XID = oauthID
 		case "github":
 			mahasiswa.GithubID = oauthID
 		}
 
 		if err := s.userRepo.CreateMahasiswa(ctx, mahasiswa); err != nil {
+			// Check if it's a duplicate key error
+			if mongo.IsDuplicateKeyError(err) {
+				return nil, fmt.Errorf("user with this email or OAuth account already exists")
+			}
 			return nil, fmt.Errorf("failed to create mahasiswa: %w", err)
 		}
+
+		// OAuth users don't need email verification (already verified by OAuth provider)
 
 		// Generate tokens
 		accessToken, err := s.jwtManager.GenerateAccessToken(mahasiswa.ID, mahasiswa.Email, "mahasiswa", false)
@@ -854,11 +967,6 @@ func (s *userService) createOAuthUser(ctx context.Context, email, name, picture,
 			return nil, fmt.Errorf("failed to store refresh token: %w", err)
 		}
 
-		// Send welcome email
-		if err := s.emailService.SendWelcomeEmail(email, name); err != nil {
-			fmt.Printf("Failed to send welcome email: %v\n", err)
-		}
-
 		return &models.AuthResponse{
 			User:         mahasiswa,
 			AccessToken:  accessToken,
@@ -873,6 +981,8 @@ func (s *userService) createOAuthUser(ctx context.Context, email, name, picture,
 				Email:          email,
 				EmailVerified:  true, // OAuth emails are pre-verified
 				ProfilePicture: picture,
+				UserType:       models.UserTypeAdmin,
+				Status:         models.UserStatusActive,
 			},
 			IsAdmin:     true,
 			Permissions: []string{"read", "write", "delete"},
@@ -884,13 +994,17 @@ func (s *userService) createOAuthUser(ctx context.Context, email, name, picture,
 			admin.GoogleID = oauthID
 		case "facebook":
 			admin.FacebookID = oauthID
-		case "apple":
-			admin.AppleID = oauthID
+		case "x":
+			admin.XID = oauthID
 		case "github":
 			admin.GithubID = oauthID
 		}
 
 		if err := s.userRepo.CreateAdmin(ctx, admin); err != nil {
+			// Check if it's a duplicate key error
+			if mongo.IsDuplicateKeyError(err) {
+				return nil, fmt.Errorf("user with this email or OAuth account already exists")
+			}
 			return nil, fmt.Errorf("failed to create admin: %w", err)
 		}
 
@@ -917,6 +1031,64 @@ func (s *userService) createOAuthUser(ctx context.Context, email, name, picture,
 
 		return &models.AuthResponse{
 			User:         admin,
+			AccessToken:  accessToken,
+			RefreshToken: refreshToken,
+			ExpiresIn:    int64(s.jwtManager.GetAccessTokenExpiry().Seconds()),
+		}, nil
+	} else if userType == "user" {
+		// Create regular user (external/non-mahasiswa)
+		user := &models.User{
+			FullName:       name,
+			Email:          email,
+			EmailVerified:  true, // OAuth emails are pre-verified
+			ProfilePicture: picture,
+			UserType:       models.UserTypeExternal,
+			Status:         models.UserStatusPending, // External users need approval
+		}
+
+		// Set OAuth ID
+		switch provider {
+		case "google":
+			user.GoogleID = oauthID
+		case "facebook":
+			user.FacebookID = oauthID
+		case "x":
+			user.XID = oauthID
+		case "github":
+			user.GithubID = oauthID
+		}
+
+		if err := s.userRepo.Create(ctx, user); err != nil {
+			// Check if it's a duplicate key error
+			if mongo.IsDuplicateKeyError(err) {
+				return nil, fmt.Errorf("user with this email or OAuth account already exists")
+			}
+			return nil, fmt.Errorf("failed to create user: %w", err)
+		}
+
+		// Generate tokens
+		accessToken, err := s.jwtManager.GenerateAccessToken(user.ID, user.Email, "user", false)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate access token: %w", err)
+		}
+
+		refreshToken, err := s.jwtManager.GenerateRefreshToken(user.ID, user.Email, false)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate refresh token: %w", err)
+		}
+
+		// Store refresh token
+		if err := s.userRepo.SetRefreshToken(ctx, user.ID, refreshToken); err != nil {
+			return nil, fmt.Errorf("failed to store refresh token: %w", err)
+		}
+
+		// Send welcome email
+		if err := s.emailService.SendWelcomeEmail(email, name); err != nil {
+			fmt.Printf("Failed to send welcome email: %v\n", err)
+		}
+
+		return &models.AuthResponse{
+			User:         user,
 			AccessToken:  accessToken,
 			RefreshToken: refreshToken,
 			ExpiresIn:    int64(s.jwtManager.GetAccessTokenExpiry().Seconds()),

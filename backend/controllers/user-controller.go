@@ -1,7 +1,10 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
+	"net/url"
+	"os"
 
 	"backend/middleware"
 	"backend/models"
@@ -288,7 +291,7 @@ func (uc *UserController) ResetPassword(c *gin.Context) {
 // @Description Get OAuth authorization URL for specified provider
 // @Tags auth
 // @Produce json
-// @Param provider path string true "OAuth provider" Enums(google, facebook, apple, github)
+// @Param provider path string true "OAuth provider" Enums(google, facebook, x, github)
 // @Param user_type query string true "User type" Enums(mahasiswa, admin)
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
@@ -452,4 +455,90 @@ func (uc *UserController) HealthCheck(c *gin.Context) {
 		"status":  "healthy",
 		"service": "user-service",
 	})
+}
+
+// GoogleOAuthCallback handles Google OAuth callback
+func (uc *UserController) GoogleOAuthCallback(c *gin.Context) {
+	uc.handleOAuthCallback(c, "google")
+}
+
+// FacebookOAuthCallback handles Facebook OAuth callback
+func (uc *UserController) FacebookOAuthCallback(c *gin.Context) {
+	uc.handleOAuthCallback(c, "facebook")
+}
+
+// XOAuthCallback handles X OAuth callback
+func (uc *UserController) XOAuthCallback(c *gin.Context) {
+	uc.handleOAuthCallback(c, "x")
+}
+
+// GithubOAuthCallback handles GitHub OAuth callback
+func (uc *UserController) GithubOAuthCallback(c *gin.Context) {
+	uc.handleOAuthCallback(c, "github")
+}
+
+// handleOAuthCallback is a helper method to handle OAuth callbacks for all providers
+func (uc *UserController) handleOAuthCallback(c *gin.Context, provider string) {
+	code := c.Query("code")
+	state := c.Query("state")
+	errorParam := c.Query("error")
+
+	// Parse state to get user type
+	userType := "mahasiswa" // default
+	if state != "" {
+		if state == "admin" {
+			userType = "admin"
+		}
+	}
+
+	// Get frontend URL from environment or use default (always 5173 now)
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:5173" // Standardized port for both dev and production
+	}
+
+	// Handle OAuth error
+	if errorParam != "" {
+		c.Redirect(302, fmt.Sprintf("%s/oauth-callback?error=%s", frontendURL, errorParam))
+		return
+	}
+
+	// Handle missing code
+	if code == "" {
+		c.Redirect(302, fmt.Sprintf("%s/oauth-callback?error=missing_code", frontendURL))
+		return
+	}
+
+	// Process OAuth callback
+	request := models.OAuthRequest{
+		Provider: provider,
+		Code:     code,
+		UserType: models.UserType(userType),
+	}
+
+	response, err := uc.userService.OAuthLogin(c.Request.Context(), &request)
+	if err != nil {
+		c.Redirect(302, fmt.Sprintf("%s/oauth-callback?error=%s", frontendURL, url.QueryEscape(err.Error())))
+		return
+	}
+
+	// Determine user type from response
+	var userTypeStr string
+	switch response.User.(type) {
+	case *models.Admin:
+		userTypeStr = "admin"
+	case *models.UserMahasiswa:
+		userTypeStr = "mahasiswa"
+	default:
+		userTypeStr = "user"
+	}
+
+	// Redirect to frontend with tokens
+	redirectURL := fmt.Sprintf("%s/oauth-callback?access_token=%s&refresh_token=%s&user_type=%s",
+		frontendURL,
+		url.QueryEscape(response.AccessToken),
+		url.QueryEscape(response.RefreshToken),
+		url.QueryEscape(userTypeStr))
+
+	c.Redirect(302, redirectURL)
 }

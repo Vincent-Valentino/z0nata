@@ -46,6 +46,8 @@ export const AdminQuestions = () => {
   const [typeFilter, setTypeFilter] = useState<'all' | 'single_choice' | 'multiple_choice' | 'essay'>('all')
   const [difficultyFilter, setDifficultyFilter] = useState<'all' | 'easy' | 'medium' | 'hard'>('all')
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [questions, setQuestions] = useState<Question[]>([])
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -78,6 +80,8 @@ export const AdminQuestions = () => {
     sampleAnswer: '',
     maxPoints: 10
   })
+  const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null)
+  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null)
 
   // Load questions and stats from API
   useEffect(() => {
@@ -341,6 +345,46 @@ export const AdminQuestions = () => {
       } else {
         alert('Failed to delete question. Please try again.')
       }
+    }
+  }
+
+  const handleViewQuestion = (question: Question) => {
+    setSelectedQuestion(question)
+    setIsViewDialogOpen(true)
+  }
+
+  const handleEditQuestion = (question: Question) => {
+    setEditingQuestion(question)
+    setIsEditDialogOpen(true)
+  }
+
+  const handleUpdateQuestion = async () => {
+    if (!editingQuestion) return
+
+    try {
+      setSubmitLoading(true)
+      
+      const updateData = {
+        title: editingQuestion.title,
+        difficulty: editingQuestion.difficulty,
+        points: editingQuestion.points,
+        is_active: editingQuestion.isActive
+      }
+
+      await questionService.updateQuestion(editingQuestion.id, updateData)
+      
+      // Close dialog and reload
+      setIsEditDialogOpen(false)
+      setEditingQuestion(null)
+      await loadQuestions()
+      await loadStats()
+      
+      alert('Question updated successfully!')
+    } catch (err: any) {
+      console.error('Error updating question:', err)
+      alert('Failed to update question. Please try again.')
+    } finally {
+      setSubmitLoading(false)
     }
   }
 
@@ -924,10 +968,20 @@ export const AdminQuestions = () => {
                   
                   {/* Action Buttons */}
                   <div className="flex items-center gap-1 ml-4">
-                    <Button variant="ghost" size="sm" title="View Details">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      title="View Details & Correct Answers"
+                      onClick={() => handleViewQuestion(question)}
+                    >
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" title="Edit Question">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      title="Edit Question"
+                      onClick={() => handleEditQuestion(question)}
+                    >
                       <Edit className="h-4 w-4" />
                     </Button>
                     <Button 
@@ -972,6 +1026,246 @@ export const AdminQuestions = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* View Question Dialog */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Question Details</DialogTitle>
+          </DialogHeader>
+          
+          {selectedQuestion && (
+            <div className="space-y-6">
+              {/* Question Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Question ID</label>
+                  <p className="text-sm text-gray-600 font-mono">{selectedQuestion.id}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Type</label>
+                  <p className="text-sm capitalize">{selectedQuestion.type.replace('_', ' ')}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Difficulty</label>
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    selectedQuestion.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
+                    selectedQuestion.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {selectedQuestion.difficulty.toUpperCase()}
+                  </span>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Points</label>
+                  <p className="text-sm">{selectedQuestion.points}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Active</label>
+                  <p className="text-sm">{selectedQuestion.isActive ? 'Yes' : 'No'}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Max Points</label>
+                  <p className="text-sm">{selectedQuestion.maxPoints || 'N/A'}</p>
+                </div>
+              </div>
+
+              {/* Question Title */}
+              <div>
+                <label className="text-sm font-medium text-gray-700">Question Title</label>
+                <div className="mt-1 p-3 border rounded-md bg-gray-50">
+                  <p className="text-sm">{selectedQuestion.title}</p>
+                </div>
+              </div>
+
+              {/* Options and Correct Answers */}
+              {selectedQuestion.type !== 'essay' && selectedQuestion.options && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Options & Correct Answers</label>
+                  <div className="mt-2 space-y-2">
+                    {selectedQuestion.options.map((option, index) => {
+                      const isCorrect = selectedQuestion.correctAnswers?.includes(option.id)
+                      return (
+                        <div
+                          key={option.id}
+                          className={`p-3 border rounded-md ${
+                            isCorrect 
+                              ? 'border-green-500 bg-green-50' 
+                              : 'border-gray-200 bg-white'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm">{option.text}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500 font-mono">ID: {option.id}</span>
+                              {isCorrect && (
+                                <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">
+                                  ✓ Correct Answer
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Sample Answer for Essay */}
+              {selectedQuestion.type === 'essay' && selectedQuestion.sampleAnswer && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Sample Answer</label>
+                  <div className="mt-1 p-3 border rounded-md bg-gray-50">
+                    <p className="text-sm whitespace-pre-wrap">{selectedQuestion.sampleAnswer}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Timestamps */}
+              <div className="grid grid-cols-2 gap-4 text-xs text-gray-500">
+                <div>
+                  <label className="font-medium">Created At</label>
+                  <p>{new Date(selectedQuestion.createdAt).toLocaleString()}</p>
+                </div>
+                <div>
+                  <label className="font-medium">Updated At</label>
+                  <p>{new Date(selectedQuestion.updatedAt).toLocaleString()}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Question Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Question</DialogTitle>
+          </DialogHeader>
+          
+          {editingQuestion && (
+            <div className="space-y-6">
+              {/* Question Title */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Question Title *
+                </label>
+                <textarea
+                  value={editingQuestion.title}
+                  onChange={(e) => setEditingQuestion({
+                    ...editingQuestion,
+                    title: e.target.value
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  placeholder="Enter question title..."
+                />
+              </div>
+
+              {/* Question Details */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Type
+                  </label>
+                  <input
+                    type="text"
+                    value={editingQuestion.type.replace('_', ' ')}
+                    disabled
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-500 capitalize"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Question type cannot be changed</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Difficulty *
+                  </label>
+                  <select
+                    value={editingQuestion.difficulty}
+                    onChange={(e) => setEditingQuestion({
+                      ...editingQuestion,
+                      difficulty: e.target.value as 'easy' | 'medium' | 'hard'
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Points *
+                  </label>
+                  <input
+                    type="number"
+                    value={editingQuestion.points}
+                    onChange={(e) => setEditingQuestion({
+                      ...editingQuestion,
+                      points: parseInt(e.target.value) || 0
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    min="1"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Active Status
+                  </label>
+                  <select
+                    value={editingQuestion.isActive ? 'true' : 'false'}
+                    onChange={(e) => setEditingQuestion({
+                      ...editingQuestion,
+                      isActive: e.target.value === 'true'
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                <div className="flex">
+                  <div className="ml-3">
+                    <p className="text-sm text-yellow-700">
+                      <strong>Note:</strong> Only basic properties can be edited. To modify options, correct answers, or sample answers, 
+                      you'll need to delete and recreate the question.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditDialogOpen(false)
+                    setEditingQuestion(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleUpdateQuestion}
+                  disabled={submitLoading || !editingQuestion.title.trim()}
+                >
+                  {submitLoading ? 'Updating...' : 'Update Question'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 } 

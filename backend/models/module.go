@@ -13,6 +13,7 @@ type Module struct {
 	SubModules  []SubModule        `json:"sub_modules" bson:"sub_modules"`
 	Content     string             `json:"content" bson:"content"`           // Markdown content
 	IsPublished bool               `json:"is_published" bson:"is_published"` // Publication status
+	Order       int                `json:"order" bson:"order"`               // Display order (for sorting)
 
 	// Metadata
 	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
@@ -27,6 +28,7 @@ type SubModule struct {
 	Description string             `json:"description" bson:"description" binding:"max=500"`
 	Content     string             `json:"content" bson:"content"`           // Markdown content
 	IsPublished bool               `json:"is_published" bson:"is_published"` // Publication status
+	Order       int                `json:"order" bson:"order"`               // Display order (for sorting)
 
 	// Metadata
 	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
@@ -40,6 +42,7 @@ type CreateModuleRequest struct {
 	Name        string      `json:"name" binding:"required,min=1,max=200"`
 	Description string      `json:"description" binding:"max=500"`
 	Content     string      `json:"content" binding:"required"`
+	Order       int         `json:"order,omitempty"` // Optional order field
 	SubModules  []SubModule `json:"sub_modules,omitempty"`
 }
 
@@ -47,6 +50,7 @@ type UpdateModuleRequest struct {
 	Name        *string     `json:"name,omitempty" binding:"omitempty,min=1,max=200"`
 	Description *string     `json:"description,omitempty" binding:"omitempty,max=500"`
 	Content     *string     `json:"content,omitempty"`
+	Order       *int        `json:"order,omitempty"` // Optional order field
 	SubModules  []SubModule `json:"sub_modules,omitempty"`
 }
 
@@ -54,6 +58,7 @@ type CreateSubModuleRequest struct {
 	Name        string `json:"name" binding:"required,min=1,max=200"`
 	Description string `json:"description" binding:"max=500"`
 	Content     string `json:"content" binding:"required"`
+	Order       int    `json:"order,omitempty"` // Optional order field
 }
 
 // Additional request/response models for API

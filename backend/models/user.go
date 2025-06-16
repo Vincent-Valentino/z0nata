@@ -40,7 +40,7 @@ type User struct {
 	// OAuth fields
 	GoogleID   string `json:"-" bson:"google_id,omitempty"`
 	FacebookID string `json:"-" bson:"facebook_id,omitempty"`
-	AppleID    string `json:"-" bson:"apple_id,omitempty"`
+	XID        string `json:"-" bson:"x_id,omitempty"`
 	GithubID   string `json:"-" bson:"github_id,omitempty"`
 
 	// Password reset
@@ -60,15 +60,14 @@ type User struct {
 }
 
 type Admin struct {
-	User
+	User        `bson:",inline"`
 	IsAdmin     bool     `json:"is_admin" bson:"is_admin"`
 	Permissions []string `json:"permissions" bson:"permissions"`
 }
 
 type UserMahasiswa struct {
-	User
+	User    `bson:",inline"`
 	NIM     string `json:"mahasiswa_id" bson:"mahasiswa_id"`
-	Status  string `json:"status" bson:"status"`
 	Faculty string `json:"faculty" bson:"faculty,omitempty"`
 	Major   string `json:"major" bson:"major,omitempty"`
 }
@@ -84,7 +83,7 @@ type RegisterRequest struct {
 	FullName string   `json:"full_name" binding:"required"`
 	Email    string   `json:"email" binding:"required,email"`
 	Password string   `json:"password" binding:"required,min=8"`
-	UserType UserType `json:"user_type" binding:"required,oneof=mahasiswa external admin"`
+	UserType UserType `json:"user_type" binding:"required,oneof=mahasiswa user admin"`
 
 	// Fields for mahasiswa
 	NIM     string `json:"nim,omitempty"`
@@ -105,11 +104,11 @@ type AuthResponse struct {
 }
 
 type OAuthRequest struct {
-	Provider    string   `json:"provider" binding:"required,oneof=google facebook apple github"`
+	Provider    string   `json:"provider" binding:"required,oneof=google facebook x github"`
 	Code        string   `json:"code,omitempty"`
 	AccessToken string   `json:"access_token,omitempty"`
 	IDToken     string   `json:"id_token,omitempty"`
-	UserType    UserType `json:"user_type" binding:"required,oneof=mahasiswa external admin"`
+	UserType    UserType `json:"user_type" binding:"required,oneof=mahasiswa user admin"`
 }
 
 type PasswordResetRequest struct {

@@ -32,10 +32,10 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	// Connect to MongoDB
+	// Connect to MongoDB Atlas
 	db, err := database.ConnectMongoDB(cfg.Database)
 	if err != nil {
-		log.Fatalf("Failed to connect to MongoDB: %v", err)
+		log.Fatalf("Failed to connect to MongoDB Atlas: %v", err)
 	}
 
 	// Initialize repositories
@@ -79,6 +79,15 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}
 	router.Use(cors.New(corsConfig))
+
+	// Health check endpoint for Docker health checks
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":   "ok",
+			"database": "connected",
+			"service":  "quizapp-backend",
+		})
+	})
 
 	// API version prefix
 	api := router.Group("/api/v1")

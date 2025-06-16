@@ -122,6 +122,16 @@ export const moduleService = {
   toggleSubModulePublication: async (moduleId: string, subModuleId: string, published: boolean): Promise<SubModule> => {
     return api.patch<SubModule>(`/admin/modules/${moduleId}/submodules/${subModuleId}/publish`, { published })
   },
+
+  // Reorder modules (Admin only)
+  reorderModules: async (moduleIds: string[]): Promise<void> => {
+    return api.post<void>('/admin/modules/reorder', { module_ids: moduleIds })
+  },
+
+  // Reorder submodules (Admin only)
+  reorderSubModules: async (moduleId: string, subModuleIds: string[]): Promise<void> => {
+    return api.post<void>(`/admin/modules/${moduleId}/submodules/reorder`, { submodule_ids: subModuleIds })
+  },
 }
 
 // Hook for easier use in components (optional - using React Query would be better)

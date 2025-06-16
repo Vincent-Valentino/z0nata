@@ -176,7 +176,8 @@ export const ProfilePage = () => {
                   </div>
                 </div>
 
-                {user.role === 'student' && (
+                {/* Only show academic fields for mahasiswa users */}
+                {user.role === 'student' && user.user_type === 'mahasiswa' && (
                   <>
                     <Separator />
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -326,8 +327,8 @@ export const ProfilePage = () => {
               </Card>
             )}
 
-            {/* Student Info */}
-            {user.role === 'student' && (
+            {/* Student Info - Only for mahasiswa users */}
+            {user.role === 'student' && user.user_type === 'mahasiswa' && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
