@@ -35,6 +35,7 @@ type UserService interface {
 	GetOAuthURL(provider, userType string) (string, error)
 	VerifyEmail(ctx context.Context, token string) error
 	ResendVerification(ctx context.Context, email string) error
+	UpdateLastLogout(userID string) error
 }
 
 type userService struct {
@@ -1096,4 +1097,9 @@ func (s *userService) createOAuthUser(ctx context.Context, email, name, picture,
 	}
 
 	return nil, errors.New("invalid user type")
+}
+
+// UpdateLastLogout updates the user's last logout timestamp
+func (s *userService) UpdateLastLogout(userID string) error {
+	return s.userRepo.UpdateLastLogout(userID)
 }

@@ -76,3 +76,21 @@ type GetModulesResponse struct {
 	Limit      int      `json:"limit"`
 	TotalPages int      `json:"total_pages"`
 }
+
+// Order update models for drag-and-drop functionality
+type ModuleOrderUpdate struct {
+	ModuleID  primitive.ObjectID `json:"module_id" bson:"module_id"`
+	Order     int                `json:"order" bson:"order"`
+	UpdatedBy primitive.ObjectID `json:"updated_by" bson:"updated_by"`
+}
+
+type SubModuleOrderUpdate struct {
+	SubModuleID primitive.ObjectID `json:"submodule_id" bson:"submodule_id"`
+	Order       int                `json:"order" bson:"order"`
+	UpdatedBy   primitive.ObjectID `json:"updated_by" bson:"updated_by"`
+}
+
+type BulkReorderRequest struct {
+	ModuleUpdates    []ModuleOrderUpdate    `json:"module_updates,omitempty"`
+	SubModuleUpdates []SubModuleOrderUpdate `json:"submodule_updates,omitempty"`
+}

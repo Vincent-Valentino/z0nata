@@ -26,6 +26,7 @@ func SetupModuleRoutes(router gin.IRouter, moduleController *controllers.ModuleC
 
 		// Module ordering
 		adminModules.POST("/reorder", moduleController.ReorderModules)
+		adminModules.POST("/bulk-reorder", moduleController.BulkReorder)
 
 		// Submodule CRUD
 		adminModules.POST("/:moduleId/submodules", moduleController.CreateSubModule)

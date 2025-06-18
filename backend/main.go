@@ -43,6 +43,7 @@ func main() {
 	moduleRepo := repository.NewModuleRepository(db)
 	userActivityRepo := repository.NewUserActivityRepository(db)
 	questionRepo := repository.NewQuestionRepository(db)
+	activityLogRepo := repository.NewActivityLogRepository(db)
 
 	// Initialize utilities
 	jwtManager := utils.NewJWTManager(cfg.JWT)
@@ -53,12 +54,14 @@ func main() {
 	moduleService := services.NewModuleService(moduleRepo)
 	userActivityService := services.NewUserActivityService(userActivityRepo)
 	questionService := services.NewQuestionService(questionRepo)
+	activityLogService := services.NewActivityLogService(activityLogRepo)
 
 	// Initialize controllers
-	userController := controllers.NewUserController(userService)
-	moduleController := controllers.NewModuleController(moduleService)
+	userController := controllers.NewUserController(userService, userRepo, activityLogService)
+	moduleController := controllers.NewModuleController(moduleService, activityLogService)
 	userActivityController := controllers.NewUserActivityController(userActivityService)
-	questionController := controllers.NewQuestionController(questionService)
+	questionController := controllers.NewQuestionController(questionService, activityLogService)
+	activityLogController := controllers.NewActivityLogController(activityLogService)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(jwtManager)
@@ -102,6 +105,7 @@ func main() {
 	routes.SetupModuleRoutes(api, moduleController, authMiddleware, admin)
 	routes.SetupUserActivityRoutes(api, userActivityController, authMiddleware)
 	routes.SetupQuestionRoutes(api, questionController, authMiddleware, admin)
+	routes.SetupActivityLogRoutes(api, activityLogController, authMiddleware, admin)
 
 	// API documentation endpoint
 	api.GET("/docs", func(c *gin.Context) {
@@ -130,17 +134,23 @@ func main() {
 					"GET /mahasiswa/dashboard": "Mahasiswa dashboard (requires mahasiswa auth)",
 				},
 				"admin": gin.H{
-					"GET    /admin/users":                "Get all users (requires admin auth)",
-					"DELETE /admin/users/:id":            "Delete user (requires admin auth)",
-					"GET    /admin/dashboard":            "Admin dashboard (requires admin auth)",
-					"POST   /admin/questions":            "Create new question (requires admin auth)",
-					"GET    /admin/questions":            "List questions with filtering (requires admin auth)",
-					"GET    /admin/questions/:id":        "Get specific question (requires admin auth)",
-					"PUT    /admin/questions/:id":        "Update question (requires admin auth)",
-					"DELETE /admin/questions/:id":        "Delete question (requires admin auth)",
-					"PATCH  /admin/questions/:id/status": "Toggle question status (requires admin auth)",
-					"GET    /admin/questions/stats":      "Get question statistics (requires admin auth)",
-					"POST   /admin/questions/validate":   "Validate question data (requires admin auth)",
+					"GET    /admin/users":                 "Get all users (requires admin auth)",
+					"DELETE /admin/users/:id":             "Delete user (requires admin auth)",
+					"GET    /admin/dashboard":             "Admin dashboard (requires admin auth)",
+					"POST   /admin/questions":             "Create new question (requires admin auth)",
+					"GET    /admin/questions":             "List questions with filtering (requires admin auth)",
+					"GET    /admin/questions/:id":         "Get specific question (requires admin auth)",
+					"PUT    /admin/questions/:id":         "Update question (requires admin auth)",
+					"DELETE /admin/questions/:id":         "Delete question (requires admin auth)",
+					"PATCH  /admin/questions/:id/status":  "Toggle question status (requires admin auth)",
+					"GET    /admin/questions/stats":       "Get question statistics (requires admin auth)",
+					"POST   /admin/questions/validate":    "Validate question data (requires admin auth)",
+					"GET    /admin/activity-logs":         "Get activity logs with filtering (requires admin auth)",
+					"GET    /admin/activity-logs/stats":   "Get activity statistics (requires admin auth)",
+					"GET    /admin/activity-logs/recent":  "Get recent activities (requires admin auth)",
+					"GET    /admin/activity-logs/types":   "Get available activity types (requires admin auth)",
+					"GET    /admin/activity-logs/:id":     "Get specific activity log (requires admin auth)",
+					"POST   /admin/activity-logs/cleanup": "Cleanup old activity logs (requires admin auth)",
 				},
 				"questions": gin.H{
 					"GET /questions/random": "Get random questions for quiz (public)",

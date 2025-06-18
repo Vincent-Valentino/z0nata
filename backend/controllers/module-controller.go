@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -13,13 +14,37 @@ import (
 )
 
 type ModuleController struct {
-	moduleService services.ModuleService
+	moduleService      services.ModuleService
+	activityLogService services.ActivityLogService
 }
 
-func NewModuleController(moduleService services.ModuleService) *ModuleController {
+func NewModuleController(moduleService services.ModuleService, activityLogService services.ActivityLogService) *ModuleController {
 	return &ModuleController{
-		moduleService: moduleService,
+		moduleService:      moduleService,
+		activityLogService: activityLogService,
 	}
+}
+
+// Helper method to get user information from context
+func (mc *ModuleController) getUserInfo(c *gin.Context) (string, string) {
+	userName := "Unknown User"
+	userType := "unknown"
+
+	// Try to get user name from context (if available)
+	if name, exists := c.Get("user_name"); exists {
+		if nameStr, ok := name.(string); ok {
+			userName = nameStr
+		}
+	}
+
+	// Try to get user type from context (if available)
+	if uType, exists := c.Get("user_type"); exists {
+		if typeStr, ok := uType.(string); ok {
+			userType = typeStr
+		}
+	}
+
+	return userName, userType
 }
 
 // @Summary Get all modules
@@ -120,6 +145,28 @@ func (mc *ModuleController) CreateModule(c *gin.Context) {
 		return
 	}
 
+	// Log module creation activity
+	userName, userType := mc.getUserInfo(c)
+	fmt.Printf("DEBUG: Logging module creation activity for module %s by user %s (%s)\n", module.Name, userName, userType)
+	err = mc.activityLogService.LogModuleActivity(
+		c.Request.Context(),
+		models.ActivityModuleCreated,
+		module.ID.Hex(),
+		module.Name,
+		userID,
+		userName,
+		userType,
+		map[string]interface{}{
+			"description": module.Description,
+			"order":       module.Order,
+		},
+	)
+	if err != nil {
+		fmt.Printf("ERROR: Failed to log module creation activity: %v\n", err)
+	} else {
+		fmt.Printf("SUCCESS: Module creation activity logged successfully\n")
+	}
+
 	c.JSON(http.StatusCreated, module)
 }
 
@@ -166,6 +213,36 @@ func (mc *ModuleController) UpdateModule(c *gin.Context) {
 		return
 	}
 
+	// Log module update activity
+	userName, userType := mc.getUserInfo(c)
+	changes := make(map[string]interface{})
+	if req.Name != nil {
+		changes["name"] = *req.Name
+	}
+	if req.Description != nil {
+		changes["description"] = *req.Description
+	}
+	if req.Order != nil {
+		changes["order"] = *req.Order
+	}
+
+	fmt.Printf("DEBUG: Logging module update activity for module %s by user %s (%s)\n", module.Name, userName, userType)
+	err = mc.activityLogService.LogModuleActivity(
+		c.Request.Context(),
+		models.ActivityModuleUpdated,
+		module.ID.Hex(),
+		module.Name,
+		userID,
+		userName,
+		userType,
+		changes,
+	)
+	if err != nil {
+		fmt.Printf("ERROR: Failed to log module update activity: %v\n", err)
+	} else {
+		fmt.Printf("SUCCESS: Module update activity logged successfully\n")
+	}
+
 	c.JSON(http.StatusOK, module)
 }
 
@@ -189,11 +266,34 @@ func (mc *ModuleController) DeleteModule(c *gin.Context) {
 		return
 	}
 
+	// Get module info before deletion for logging
+	module, err := mc.moduleService.GetModuleByID(c.Request.Context(), moduleID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
 	err = mc.moduleService.DeleteModule(c.Request.Context(), moduleID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Log module deletion activity
+	userID, _ := middleware.GetUserID(c)
+	userName, userType := mc.getUserInfo(c)
+	mc.activityLogService.LogModuleActivity(
+		c.Request.Context(),
+		models.ActivityModuleDeleted,
+		module.ID.Hex(),
+		module.Name,
+		userID,
+		userName,
+		userType,
+		map[string]interface{}{
+			"submodules_count": len(module.SubModules),
+		},
+	)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Module deleted successfully"})
 }
@@ -243,6 +343,26 @@ func (mc *ModuleController) ToggleModulePublication(c *gin.Context) {
 		return
 	}
 
+	// Log module publication activity
+	userName, userType := mc.getUserInfo(c)
+	activityType := models.ActivityModulePublished
+	if !req.Published {
+		activityType = models.ActivityModuleUnpublished
+	}
+
+	mc.activityLogService.LogModuleActivity(
+		c.Request.Context(),
+		activityType,
+		module.ID.Hex(),
+		module.Name,
+		userID,
+		userName,
+		userType,
+		map[string]interface{}{
+			"published": req.Published,
+		},
+	)
+
 	c.JSON(http.StatusOK, module)
 }
 
@@ -289,6 +409,23 @@ func (mc *ModuleController) CreateSubModule(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Log submodule creation activity
+	userName, userType := mc.getUserInfo(c)
+	mc.activityLogService.LogModuleActivity(
+		c.Request.Context(),
+		models.ActivitySubModuleCreated,
+		subModule.ID.Hex(),
+		subModule.Name,
+		userID,
+		userName,
+		userType,
+		map[string]interface{}{
+			"parent_module_id": moduleIDStr,
+			"description":      subModule.Description,
+			"order":            subModule.Order,
+		},
+	)
 
 	c.JSON(http.StatusCreated, subModule)
 }
@@ -344,6 +481,24 @@ func (mc *ModuleController) UpdateSubModule(c *gin.Context) {
 		return
 	}
 
+	// Log submodule update activity
+	userName, userType := mc.getUserInfo(c)
+	mc.activityLogService.LogModuleActivity(
+		c.Request.Context(),
+		models.ActivitySubModuleUpdated,
+		subModule.ID.Hex(),
+		subModule.Name,
+		userID,
+		userName,
+		userType,
+		map[string]interface{}{
+			"parent_module_id": moduleIDStr,
+			"name":             req.Name,
+			"description":      req.Description,
+			"order":            req.Order,
+		},
+	)
+
 	c.JSON(http.StatusOK, subModule)
 }
 
@@ -375,11 +530,43 @@ func (mc *ModuleController) DeleteSubModule(c *gin.Context) {
 		return
 	}
 
+	// Get module and submodule info before deletion for logging
+	module, err := mc.moduleService.GetModuleByID(c.Request.Context(), moduleID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Module not found"})
+		return
+	}
+
+	var subModuleName string
+	for _, sm := range module.SubModules {
+		if sm.ID == subModuleID {
+			subModuleName = sm.Name
+			break
+		}
+	}
+
 	err = mc.moduleService.DeleteSubModule(c.Request.Context(), moduleID, subModuleID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Log submodule deletion activity
+	userID, _ := middleware.GetUserID(c)
+	userName, userType := mc.getUserInfo(c)
+	mc.activityLogService.LogModuleActivity(
+		c.Request.Context(),
+		models.ActivitySubModuleDeleted,
+		subModuleIDStr,
+		subModuleName,
+		userID,
+		userName,
+		userType,
+		map[string]interface{}{
+			"parent_module_id":   moduleIDStr,
+			"parent_module_name": module.Name,
+		},
+	)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Submodule deleted successfully"})
 }
@@ -436,6 +623,27 @@ func (mc *ModuleController) ToggleSubModulePublication(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Log submodule publication activity
+	userName, userType := mc.getUserInfo(c)
+	activityType := models.ActivitySubModulePublished
+	if !req.Published {
+		activityType = models.ActivitySubModuleUnpublished
+	}
+
+	mc.activityLogService.LogModuleActivity(
+		c.Request.Context(),
+		activityType,
+		subModule.ID.Hex(),
+		subModule.Name,
+		userID,
+		userName,
+		userType,
+		map[string]interface{}{
+			"parent_module_id": moduleIDStr,
+			"published":        req.Published,
+		},
+	)
 
 	c.JSON(http.StatusOK, subModule)
 }
@@ -524,4 +732,41 @@ func (mc *ModuleController) ReorderSubModules(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Submodules reordered successfully"})
+}
+
+// @Summary Bulk reorder modules and submodules
+// @Description Update the display order of multiple modules and submodules in one request (Admin only)
+// @Tags modules
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body models.BulkReorderRequest true "Bulk reorder data"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Router /admin/modules/bulk-reorder [post]
+func (mc *ModuleController) BulkReorder(c *gin.Context) {
+	userID, exists := middleware.GetUserID(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		return
+	}
+
+	var req models.BulkReorderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request data",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	err := mc.moduleService.BulkReorder(c.Request.Context(), &req, userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Items reordered successfully"})
 }

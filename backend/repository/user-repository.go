@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"backend/models"
@@ -46,6 +47,9 @@ type UserRepository interface {
 	GetUserStats(ctx context.Context) (*models.UserStatsResponse, error)
 	GetRecentRegistrations(ctx context.Context, days int) (int64, error)
 	SearchUsers(ctx context.Context, query string, userType models.UserType, status models.UserStatus, page, limit int) ([]*models.UserSummary, int64, error)
+
+	// UpdateLastLogout updates the user's last logout timestamp
+	UpdateLastLogout(userID string) error
 }
 
 type userRepository struct {
@@ -634,4 +638,31 @@ func (r *userRepository) SearchUsers(ctx context.Context, query string, userType
 	}
 
 	return users, response.Total, nil
+}
+
+// UpdateLastLogout updates the user's last logout timestamp
+func (r *userRepository) UpdateLastLogout(userID string) error {
+	now := time.Now()
+
+	// Convert userID to ObjectID
+	objectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return fmt.Errorf("invalid user ID format: %v", err)
+	}
+
+	// Update the user's last_logout field
+	filter := bson.M{"_id": objectID}
+	update := bson.M{
+		"$set": bson.M{
+			"last_logout": now,
+			"updated_at":  now,
+		},
+	}
+
+	_, err = r.userCollection.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return fmt.Errorf("failed to update last logout: %v", err)
+	}
+
+	return nil
 }

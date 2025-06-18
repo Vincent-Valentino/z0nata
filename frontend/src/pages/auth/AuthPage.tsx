@@ -81,7 +81,7 @@ export const AuthPage = () => {
           full_name: data.name || '',
           email: data.email,
           password: data.password,
-          user_type: 'mahasiswa',
+          user_type: 'mahasiswa', // This maps to UserTypeMahasiswa in backend
           nim: data.nim,
           faculty: data.faculty || '',
           major: data.major || ''
@@ -99,8 +99,8 @@ export const AuthPage = () => {
           last_login: response.user.last_login || new Date().toISOString(),
           created_at: response.user.created_at || new Date().toISOString(),
           updated_at: response.user.updated_at || new Date().toISOString(),
-          role: 'student' as const,
-          user_type: 'mahasiswa' as const,
+          role: 'student' as const, // Frontend role for mahasiswa
+          user_type: 'mahasiswa' as const, // Backend user type
           nim: response.user.mahasiswa_id || response.user.nim,
           faculty: response.user.faculty,
           major: response.user.major,
@@ -121,7 +121,7 @@ export const AuthPage = () => {
 
         login(user, response.access_token, response.refresh_token)
         toast.success('Registrasi berhasil! Selamat datang!')
-        navigate('/profile')
+        navigate('/home') // Redirect to home instead of profile
         
       } else {
         // Login
@@ -143,8 +143,8 @@ export const AuthPage = () => {
           last_login: response.user.last_login || new Date().toISOString(),
           created_at: response.user.created_at || new Date().toISOString(),
           updated_at: response.user.updated_at || new Date().toISOString(),
-          role: 'student' as const,
-          user_type: 'mahasiswa' as const,
+          role: 'student' as const, // Frontend role for mahasiswa
+          user_type: 'mahasiswa' as const, // Backend user type
           nim: response.user.mahasiswa_id || response.user.nim,
           faculty: response.user.faculty,
           major: response.user.major,
@@ -165,7 +165,7 @@ export const AuthPage = () => {
 
         login(user, response.access_token, response.refresh_token)
         toast.success('Login berhasil! Selamat datang kembali!')
-        navigate('/profile')
+        navigate('/home') // Redirect to home instead of profile
       }
     } catch (error: any) {
       console.error(`Mikroskil ${authType} error:`, error)
@@ -187,7 +187,7 @@ export const AuthPage = () => {
           full_name: data.name || '',
           email: data.email,
           password: data.password,
-          user_type: 'user' // Regular users use "user" type (maps to external in backend)
+          user_type: 'user' // This maps to UserTypeExternal in backend
         }
 
         const response = await api.post<AuthResponse>('/auth/register', registerData)
@@ -202,8 +202,8 @@ export const AuthPage = () => {
           last_login: response.user.last_login || new Date().toISOString(),
           created_at: response.user.created_at || new Date().toISOString(),
           updated_at: response.user.updated_at || new Date().toISOString(),
-          role: 'student' as const, // Regular users still get student role in frontend
-          user_type: 'user' as const,
+          role: 'student' as const, // Frontend role for external users
+          user_type: 'user' as const, // Backend user type (external)
           is_admin: false,
           permissions: ['read'],
           preferences: {
@@ -221,7 +221,7 @@ export const AuthPage = () => {
 
         login(user, response.access_token, response.refresh_token)
         toast.success('Registrasi berhasil! Selamat datang!')
-        navigate('/profile')
+        navigate('/home') // Redirect to home instead of profile
         
       } else {
         // Login
@@ -243,8 +243,8 @@ export const AuthPage = () => {
           last_login: response.user.last_login || new Date().toISOString(),
           created_at: response.user.created_at || new Date().toISOString(),
           updated_at: response.user.updated_at || new Date().toISOString(),
-          role: 'student' as const,
-          user_type: 'user' as const,
+          role: 'student' as const, // Frontend role for external users
+          user_type: 'user' as const, // Backend user type (external)
           is_admin: false,
           permissions: ['read'],
           preferences: {
@@ -262,7 +262,7 @@ export const AuthPage = () => {
 
         login(user, response.access_token, response.refresh_token)
         toast.success('Login berhasil! Selamat datang kembali!')
-        navigate('/profile')
+        navigate('/home') // Redirect to home instead of profile
       }
     } catch (error: any) {
       console.error(`Regular ${authType} error:`, error)

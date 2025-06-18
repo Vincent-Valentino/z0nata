@@ -2,12 +2,15 @@ package controllers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 
 	"backend/middleware"
 	"backend/models"
+	"backend/repository"
 	"backend/services"
 
 	"github.com/gin-gonic/gin"
@@ -15,12 +18,16 @@ import (
 )
 
 type UserController struct {
-	userService services.UserService
+	userService        services.UserService
+	userRepository     repository.UserRepository
+	activityLogService services.ActivityLogService
 }
 
-func NewUserController(userService services.UserService) *UserController {
+func NewUserController(userService services.UserService, userRepository repository.UserRepository, activityLogService services.ActivityLogService) *UserController {
 	return &UserController{
-		userService: userService,
+		userService:        userService,
+		userRepository:     userRepository,
+		activityLogService: activityLogService,
 	}
 }
 
@@ -77,11 +84,85 @@ func (uc *UserController) Login(c *gin.Context) {
 		return
 	}
 
+	// Extract client info for activity logging
+	ipAddress, userAgent := services.ExtractClientInfo(c.Request)
+
 	response, err := uc.userService.Login(c.Request.Context(), &req)
 	if err != nil {
+		// Log failed login attempt
+		go uc.activityLogService.LogAuthActivity(
+			c.Request.Context(),
+			models.ActivityUserLoginFailed,
+			"", // No user ID for failed login
+			req.Email,
+			"unknown", // User type unknown for failed login
+			false,
+			ipAddress,
+			userAgent,
+			err.Error(),
+		)
+
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Type assert the user from interface{} to access fields
+	var userID, userName, userType string
+	var activityType models.ActivityType = models.ActivityUserLogin
+
+	if user, ok := response.User.(models.User); ok {
+		userID = user.ID.Hex()
+		userName = user.FullName
+		userType = string(user.UserType)
+
+		// Determine activity type based on user type
+		switch user.UserType {
+		case "admin":
+			activityType = models.ActivityAdminLogin
+		case "mahasiswa":
+			activityType = models.ActivityMahasiswaLogin
+		default:
+			activityType = models.ActivityExternalLogin
+		}
+	} else if userMap, ok := response.User.(map[string]interface{}); ok {
+		// Handle case where user is returned as a map
+		if id, exists := userMap["id"]; exists {
+			if oid, ok := id.(primitive.ObjectID); ok {
+				userID = oid.Hex()
+			}
+		}
+		if name, exists := userMap["full_name"]; exists {
+			if nameStr, ok := name.(string); ok {
+				userName = nameStr
+			}
+		}
+		if uType, exists := userMap["user_type"]; exists {
+			if typeStr, ok := uType.(string); ok {
+				userType = typeStr
+				switch typeStr {
+				case "admin":
+					activityType = models.ActivityAdminLogin
+				case "mahasiswa":
+					activityType = models.ActivityMahasiswaLogin
+				default:
+					activityType = models.ActivityExternalLogin
+				}
+			}
+		}
+	}
+
+	// Log successful login
+	go uc.activityLogService.LogAuthActivity(
+		c.Request.Context(),
+		activityType,
+		userID,
+		userName,
+		userType,
+		true,
+		ipAddress,
+		userAgent,
+		"",
+	)
 
 	c.JSON(http.StatusOK, response)
 }
@@ -124,18 +205,94 @@ func (uc *UserController) RefreshToken(c *gin.Context) {
 // @Failure 401 {object} map[string]string
 // @Router /auth/logout [post]
 func (uc *UserController) Logout(c *gin.Context) {
-	userID, exists := middleware.GetUserID(c)
+	// Get user ID from context (set by auth middleware)
+	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":   "Unauthorized",
+			"message": "User not authenticated",
+		})
 		return
 	}
 
-	if err := uc.userService.Logout(c.Request.Context(), userID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to logout"})
+	// Get the token from Authorization header
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Bad Request",
+			"message": "Authorization header required",
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
+	// Extract token from "Bearer <token>"
+	tokenParts := strings.Split(authHeader, " ")
+	if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Bad Request",
+			"message": "Invalid authorization header format",
+		})
+		return
+	}
+
+	token := tokenParts[1]
+
+	// Log the logout attempt
+	log.Printf("User logout attempt - UserID: %v, Token: %s...", userID, token[:min(len(token), 10)])
+
+	// Update user's last logout time (optional)
+	userIDStr := fmt.Sprintf("%v", userID)
+	err := uc.userService.UpdateLastLogout(userIDStr)
+	if err != nil {
+		log.Printf("Failed to update last logout for user %s: %v", userIDStr, err)
+		// Don't fail the logout for this error
+	}
+
+	// Get user details for activity logging
+	userOID, err := primitive.ObjectIDFromHex(userIDStr)
+	if err == nil {
+		profile, err := uc.userService.GetProfile(c.Request.Context(), userOID)
+		if err == nil {
+			// Extract client info for activity logging
+			ipAddress, userAgent := services.ExtractClientInfo(c.Request)
+
+			// Type assert the profile to access fields
+			var userName, userType string
+			if user, ok := profile.(models.User); ok {
+				userName = user.FullName
+				userType = string(user.UserType)
+			} else if userMap, ok := profile.(map[string]interface{}); ok {
+				if name, exists := userMap["full_name"]; exists {
+					if nameStr, ok := name.(string); ok {
+						userName = nameStr
+					}
+				}
+				if uType, exists := userMap["user_type"]; exists {
+					if typeStr, ok := uType.(string); ok {
+						userType = typeStr
+					}
+				}
+			}
+
+			// Log logout activity
+			go uc.activityLogService.LogAuthActivity(
+				c.Request.Context(),
+				models.ActivityUserLogout,
+				userIDStr,
+				userName,
+				userType,
+				true,
+				ipAddress,
+				userAgent,
+				"",
+			)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Logout successful",
+		"status":  "success",
+	})
 }
 
 // @Summary Get user profile
@@ -408,31 +565,94 @@ func (uc *UserController) ResendVerification(c *gin.Context) {
 // @Security BearerAuth
 // @Param page query int false "Page number" default(1)
 // @Param limit query int false "Items per page" default(10)
-// @Success 200 {object} map[string]interface{}
+// @Param search query string false "Search term"
+// @Param user_type query string false "User type filter"
+// @Param status query string false "Status filter"
+// @Success 200 {object} models.ListUsersResponse
 // @Failure 401 {object} map[string]string
 // @Failure 403 {object} map[string]string
 // @Router /admin/users [get]
 func (uc *UserController) GetAllUsers(c *gin.Context) {
-	// This would be implemented with a separate admin service
-	// For now, returning a placeholder
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Admin endpoint - Get all users",
-		"note":    "Implementation needed in admin service",
-	})
+	// Check if user is admin
+	userType, exists := middleware.GetUserType(c)
+	if !exists || userType != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Admin access required"})
+		return
+	}
+
+	var req models.ListUsersRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid query parameters",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Set defaults
+	if req.Page == 0 {
+		req.Page = 1
+	}
+	if req.Limit == 0 {
+		req.Limit = 20
+	}
+
+	response, err := uc.userRepository.ListUsers(c.Request.Context(), &req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get users"})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
-// @Summary Delete user (Admin only)
-// @Description Delete a user account
+// @Summary Get user statistics (Admin only)
+// @Description Get user statistics and counts
 // @Tags admin
 // @Produce json
 // @Security BearerAuth
+// @Success 200 {object} models.UserStatsResponse
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Router /admin/users/stats [get]
+func (uc *UserController) GetUserStats(c *gin.Context) {
+	// Check if user is admin
+	userType, exists := middleware.GetUserType(c)
+	if !exists || userType != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Admin access required"})
+		return
+	}
+
+	stats, err := uc.userRepository.GetUserStats(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user statistics"})
+		return
+	}
+
+	c.JSON(http.StatusOK, stats)
+}
+
+// @Summary Update user status (Admin only)
+// @Description Update a user's status (active, pending, suspended, rejected)
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
 // @Param id path string true "User ID"
+// @Param request body models.UpdateUserStatusRequest true "Status update data"
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
 // @Failure 401 {object} map[string]string
 // @Failure 403 {object} map[string]string
-// @Router /admin/users/{id} [delete]
-func (uc *UserController) DeleteUser(c *gin.Context) {
+// @Router /admin/users/{id}/status [put]
+func (uc *UserController) UpdateUserStatus(c *gin.Context) {
+	// Check if user is admin
+	userType, exists := middleware.GetUserType(c)
+	if !exists || userType != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Admin access required"})
+		return
+	}
+
 	userIDStr := c.Param("id")
 	userID, err := primitive.ObjectIDFromHex(userIDStr)
 	if err != nil {
@@ -440,12 +660,294 @@ func (uc *UserController) DeleteUser(c *gin.Context) {
 		return
 	}
 
-	// This would be implemented with a separate admin service
-	// For now, returning a placeholder
+	var req models.UpdateUserStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request data",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Get user info before updating for logging
+	user, err := uc.userRepository.GetByID(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	if err := uc.userRepository.UpdateUserStatus(c.Request.Context(), userID, req.Status); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user status"})
+		return
+	}
+
+	// Log user status update activity
+	go func() {
+		adminUserID, _ := middleware.GetUserID(c)
+		adminUserName, adminUserType := uc.getUserInfo(c)
+
+		activityType := models.ActivityUserActivated
+		if req.Status == models.UserStatusSuspended {
+			activityType = models.ActivityUserSuspended
+		}
+
+		uc.activityLogService.LogUserActivity(
+			c.Request.Context(),
+			activityType,
+			user.ID.Hex(),
+			user.FullName,
+			adminUserID,
+			adminUserName,
+			adminUserType,
+			map[string]interface{}{
+				"previous_status": string(user.Status),
+				"new_status":      string(req.Status),
+				"user_email":      user.Email,
+				"user_type":       string(user.UserType),
+			},
+		)
+	}()
+
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Admin endpoint - Delete user",
+		"message": "User status updated successfully",
 		"user_id": userID.Hex(),
-		"note":    "Implementation needed in admin service",
+		"status":  req.Status,
+	})
+}
+
+// @Summary Get access requests (Admin only)
+// @Description Get paginated list of access requests
+// @Tags admin
+// @Produce json
+// @Security BearerAuth
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Param status query string false "Status filter"
+// @Param type query string false "Type filter"
+// @Success 200 {object} models.ListAccessRequestsResponse
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Router /admin/access-requests [get]
+func (uc *UserController) GetAccessRequests(c *gin.Context) {
+	// Check if user is admin
+	userType, exists := middleware.GetUserType(c)
+	if !exists || userType != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Admin access required"})
+		return
+	}
+
+	var req models.ListAccessRequestsRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid query parameters",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Set defaults
+	if req.Page == 0 {
+		req.Page = 1
+	}
+	if req.Limit == 0 {
+		req.Limit = 20
+	}
+
+	// For now, return pending users as access requests
+	// This is a simplified implementation - in a real app you might have a separate access_requests collection
+	userReq := &models.ListUsersRequest{
+		Page:     req.Page,
+		Limit:    req.Limit,
+		Status:   models.UserStatusPending,
+		UserType: models.UserTypeExternal, // Only external users need approval
+	}
+
+	userResponse, err := uc.userRepository.ListUsers(c.Request.Context(), userReq)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get access requests"})
+		return
+	}
+
+	// Convert users to access requests format
+	requests := make([]models.AccessRequest, len(userResponse.Users))
+	for i, user := range userResponse.Users {
+		requests[i] = models.AccessRequest{
+			ID:          user.ID,
+			UserID:      user.ID,
+			RequestType: user.UserType,
+			FullName:    user.FullName,
+			Email:       user.Email,
+			Status:      user.Status,
+			RequestedAt: user.CreatedAt,
+		}
+	}
+
+	response := &models.ListAccessRequestsResponse{
+		Requests:   requests,
+		Total:      userResponse.Total,
+		Page:       userResponse.Page,
+		Limit:      userResponse.Limit,
+		TotalPages: userResponse.TotalPages,
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// @Summary Approve access request (Admin only)
+// @Description Approve a pending access request
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Request ID"
+// @Param request body models.ApproveAccessRequest true "Approval data"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Router /admin/access-requests/{id}/approve [post]
+func (uc *UserController) ApproveAccessRequest(c *gin.Context) {
+	// Check if user is admin
+	userType, exists := middleware.GetUserType(c)
+	if !exists || userType != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Admin access required"})
+		return
+	}
+
+	requestIDStr := c.Param("id")
+	requestID, err := primitive.ObjectIDFromHex(requestIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request ID"})
+		return
+	}
+
+	var req models.ApproveAccessRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request data",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Get user info before approving for logging
+	user, err := uc.userRepository.GetByID(c.Request.Context(), requestID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Update user status to active
+	if err := uc.userRepository.UpdateUserStatus(c.Request.Context(), requestID, models.UserStatusActive); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to approve access request"})
+		return
+	}
+
+	// Log access request approval activity
+	go func() {
+		adminUserID, _ := middleware.GetUserID(c)
+		adminUserName, adminUserType := uc.getUserInfo(c)
+
+		uc.activityLogService.LogUserActivity(
+			c.Request.Context(),
+			models.ActivityUserAccessGranted,
+			user.ID.Hex(),
+			user.FullName,
+			adminUserID,
+			adminUserName,
+			adminUserType,
+			map[string]interface{}{
+				"previous_status": string(user.Status),
+				"new_status":      string(models.UserStatusActive),
+				"user_email":      user.Email,
+				"user_type":       string(user.UserType),
+				"approval_note":   req.Notes,
+			},
+		)
+	}()
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":    "Access request approved successfully",
+		"request_id": requestID.Hex(),
+	})
+}
+
+// @Summary Reject access request (Admin only)
+// @Description Reject a pending access request
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Request ID"
+// @Param request body models.RejectAccessRequest true "Rejection data"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Router /admin/access-requests/{id}/reject [post]
+func (uc *UserController) RejectAccessRequest(c *gin.Context) {
+	// Check if user is admin
+	userType, exists := middleware.GetUserType(c)
+	if !exists || userType != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Admin access required"})
+		return
+	}
+
+	requestIDStr := c.Param("id")
+	requestID, err := primitive.ObjectIDFromHex(requestIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request ID"})
+		return
+	}
+
+	var req models.RejectAccessRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request data",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Get user info before rejecting for logging
+	user, err := uc.userRepository.GetByID(c.Request.Context(), requestID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Update user status to rejected
+	if err := uc.userRepository.UpdateUserStatus(c.Request.Context(), requestID, models.UserStatusRejected); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reject access request"})
+		return
+	}
+
+	// Log access request rejection activity
+	go func() {
+		adminUserID, _ := middleware.GetUserID(c)
+		adminUserName, adminUserType := uc.getUserInfo(c)
+
+		uc.activityLogService.LogUserActivity(
+			c.Request.Context(),
+			models.ActivityUserAccessRevoked,
+			user.ID.Hex(),
+			user.FullName,
+			adminUserID,
+			adminUserName,
+			adminUserType,
+			map[string]interface{}{
+				"previous_status": string(user.Status),
+				"new_status":      string(models.UserStatusRejected),
+				"user_email":      user.Email,
+				"user_type":       string(user.UserType),
+				"rejection_note":  req.Notes,
+			},
+		)
+	}()
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":    "Access request rejected successfully",
+		"request_id": requestID.Hex(),
 	})
 }
 
@@ -541,4 +1043,26 @@ func (uc *UserController) handleOAuthCallback(c *gin.Context, provider string) {
 		url.QueryEscape(userTypeStr))
 
 	c.Redirect(302, redirectURL)
+}
+
+// Helper method to get user information from context
+func (uc *UserController) getUserInfo(c *gin.Context) (string, string) {
+	userName := "Unknown User"
+	userType := "unknown"
+
+	// Try to get user name from context (if available)
+	if name, exists := c.Get("user_name"); exists {
+		if nameStr, ok := name.(string); ok {
+			userName = nameStr
+		}
+	}
+
+	// Try to get user type from context (if available)
+	if uType, exists := c.Get("user_type"); exists {
+		if typeStr, ok := uType.(string); ok {
+			userType = typeStr
+		}
+	}
+
+	return userName, userType
 }

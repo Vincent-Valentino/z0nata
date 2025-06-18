@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 
 	"backend/models"
@@ -114,10 +115,9 @@ func (s *questionService) UpdateQuestion(ctx context.Context, id primitive.Objec
 			options := make([]models.Option, len(req.Options))
 			for i, opt := range req.Options {
 				options[i] = models.Option{
-					ID:     primitive.NewObjectID().Hex(),
-					Text:   strings.TrimSpace(opt.Text),
-					Order:  i + 1,
-					Points: opt.Points,
+					ID:    primitive.NewObjectID().Hex(),
+					Text:  strings.TrimSpace(opt.Text),
+					Order: i + 1,
 				}
 			}
 			updates["options"] = options
@@ -128,9 +128,6 @@ func (s *questionService) UpdateQuestion(ctx context.Context, id primitive.Objec
 	case models.Essay:
 		if req.SampleAnswer != nil {
 			updates["sample_answer"] = strings.TrimSpace(*req.SampleAnswer)
-		}
-		if req.MaxPoints != nil {
-			updates["max_points"] = *req.MaxPoints
 		}
 	}
 
@@ -315,11 +312,6 @@ func (s *questionService) validateEssayQuestion(req *models.CreateQuestionReques
 		return errors.New("essay questions should not have correct answers")
 	}
 
-	// Validate max points if provided
-	if req.MaxPoints > 0 && req.MaxPoints < req.Points {
-		return errors.New("max points cannot be less than base points")
-	}
-
 	return nil
 }
 
@@ -328,15 +320,25 @@ func (s *questionService) processChoiceQuestion(question *models.Question, req *
 	options := make([]models.Option, len(req.Options))
 	for i, opt := range req.Options {
 		options[i] = models.Option{
-			ID:     primitive.NewObjectID().Hex(),
-			Text:   strings.TrimSpace(opt.Text),
-			Order:  i + 1,
-			Points: opt.Points,
+			ID:    primitive.NewObjectID().Hex(),
+			Text:  strings.TrimSpace(opt.Text),
+			Order: i + 1,
 		}
 	}
 
 	question.Options = options
-	question.CorrectAnswers = req.CorrectAnswers
+
+	// Map correct answer indices to generated option IDs
+	correctAnswers := make([]string, 0, len(req.CorrectAnswers))
+	for _, answerStr := range req.CorrectAnswers {
+		// Parse the answer as an index
+		if index, err := strconv.Atoi(answerStr); err == nil {
+			if index >= 0 && index < len(options) {
+				correctAnswers = append(correctAnswers, options[index].ID)
+			}
+		}
+	}
+	question.CorrectAnswers = correctAnswers
 
 	return nil
 }
@@ -344,13 +346,6 @@ func (s *questionService) processChoiceQuestion(question *models.Question, req *
 func (s *questionService) processEssayQuestion(question *models.Question, req *models.CreateQuestionRequest) error {
 	if req.SampleAnswer != "" {
 		question.SampleAnswer = strings.TrimSpace(req.SampleAnswer)
-	}
-
-	// Set max points (defaults to question points if not specified)
-	if req.MaxPoints > 0 {
-		question.MaxPoints = req.MaxPoints
-	} else {
-		question.MaxPoints = req.Points
 	}
 
 	return nil

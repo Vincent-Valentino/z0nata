@@ -41,7 +41,7 @@ interface AuthState {
 
   // Actions
   login: (user: User, token: string, refreshToken?: string) => void
-  logout: () => void
+  logout: () => Promise<void>
   updateUser: (updates: Partial<User>) => void
   setToken: (token: string) => void
 }
@@ -63,13 +63,48 @@ export const useAuthStore = create<AuthState>()(
         })
       },
 
-      logout: () => {
+      logout: async () => {
+        const { token } = get()
+        
+        try {
+          // Call backend logout endpoint if token exists
+          if (token) {
+            await fetch('http://localhost:8080/api/v1/auth/logout', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            })
+          }
+        } catch (error) {
+          console.error('Logout API call failed:', error)
+          // Continue with local logout even if API call fails
+        }
+
+        // Clear auth state
         set({
           isAuthenticated: false,
           user: null,
           token: null,
           refreshToken: null,
         })
+
+        // Clear localStorage/sessionStorage
+        localStorage.removeItem('auth-storage')
+        sessionStorage.clear()
+        
+        // Clear any other app-specific storage
+        const keysToRemove = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && (key.startsWith('auth-') || key.startsWith('user-') || key.startsWith('quiz-'))) {
+            keysToRemove.push(key)
+          }
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key))
+
+        console.log('✅ Logout completed - all storage cleared')
       },
 
       updateUser: (updates) => {
@@ -435,38 +470,85 @@ export const handleOAuthLogin = async (provider: string, userType: 'mahasiswa' |
           popup.close()
           
           try {
-            console.log('✅ OAuth backend callback successful')
+            console.log('✅ OAuth backend callback successful', event.data)
             
-            // Create user object from backend callback data
-            const user: User = {
-              id: 'oauth-user-' + Date.now(), // Temporary ID
-              full_name: 'OAuth User',
-              email: 'oauth@example.com',
-              email_verified: true,
-              profile_picture: '',
-              last_login: new Date().toISOString(),
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              role: event.data.user_type === 'admin' ? 'admin' : 'student',
-              user_type: event.data.user_type,
-              is_admin: event.data.user_type === 'admin',
-              permissions: event.data.user_type === 'admin' ? ['read', 'write', 'delete', 'admin'] : ['read'],
-              preferences: {
-                theme: 'light',
-                language: 'en',
-                notifications: true,
-              },
-              stats: {
-                testsCompleted: 0,
-                averageScore: 0,
-                totalTimeSpent: 0,
-                streak: 0,
-              },
-            }
+            // Get user profile from backend using the access token
+            const profileResponse = await fetch('http://localhost:8080/api/v1/user/profile', {
+              headers: {
+                'Authorization': `Bearer ${event.data.access_token}`,
+                'Content-Type': 'application/json'
+              }
+            })
 
-            login(user, event.data.access_token, event.data.refresh_token)
-            console.log('✅ OAuth backend login completed successfully')
-            resolve(true)
+            if (profileResponse.ok) {
+              const profileData = await profileResponse.json()
+              console.log('✅ User profile fetched:', profileData)
+              
+              // Map backend user data to frontend User interface
+              const user: User = {
+                id: profileData.id || profileData._id,
+                full_name: profileData.full_name,
+                email: profileData.email,
+                email_verified: profileData.email_verified,
+                profile_picture: profileData.profile_picture,
+                last_login: profileData.last_login || new Date().toISOString(),
+                created_at: profileData.created_at || new Date().toISOString(),
+                updated_at: profileData.updated_at || new Date().toISOString(),
+                role: event.data.user_type === 'admin' ? 'admin' : 'student',
+                user_type: event.data.user_type,
+                nim: profileData.mahasiswa_id || profileData.nim,
+                faculty: profileData.faculty,
+                major: profileData.major,
+                is_admin: profileData.is_admin || event.data.user_type === 'admin',
+                permissions: profileData.permissions || (event.data.user_type === 'admin' ? ['read', 'write', 'delete', 'admin'] : ['read']),
+                preferences: {
+                  theme: 'light',
+                  language: 'en',
+                  notifications: true,
+                },
+                stats: {
+                  testsCompleted: 0,
+                  averageScore: 0,
+                  totalTimeSpent: 0,
+                  streak: 0,
+                },
+              }
+
+              login(user, event.data.access_token, event.data.refresh_token)
+              console.log('✅ OAuth backend login completed successfully')
+              resolve(true)
+            } else {
+              // Fallback to basic user data from OAuth callback
+              const user: User = {
+                id: 'oauth-user-' + Date.now(),
+                full_name: 'OAuth User',
+                email: 'oauth@example.com',
+                email_verified: true,
+                profile_picture: '',
+                last_login: new Date().toISOString(),
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                role: event.data.user_type === 'admin' ? 'admin' : 'student',
+                user_type: event.data.user_type,
+                is_admin: event.data.user_type === 'admin',
+                permissions: event.data.user_type === 'admin' ? ['read', 'write', 'delete', 'admin'] : ['read'],
+                preferences: {
+                  theme: 'light',
+                  language: 'en',
+                  notifications: true,
+                },
+                stats: {
+                  testsCompleted: 0,
+                  averageScore: 0,
+                  totalTimeSpent: 0,
+                  streak: 0,
+                },
+              }
+
+              login(user, event.data.access_token, event.data.refresh_token)
+              console.log('✅ OAuth backend login completed with fallback user data')
+              resolve(true)
+            }
           } catch (error) {
             console.error('❌ OAuth backend callback error:', error)
             reject(error)

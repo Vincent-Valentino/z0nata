@@ -20,6 +20,7 @@ type ModuleService interface {
 	ToggleModulePublication(ctx context.Context, moduleID primitive.ObjectID, published bool, userID primitive.ObjectID) (*models.Module, error)
 	ReorderModules(ctx context.Context, moduleIDs []string, userID primitive.ObjectID) error
 	ReorderSubModules(ctx context.Context, moduleID primitive.ObjectID, subModuleIDs []string, userID primitive.ObjectID) error
+	BulkReorder(ctx context.Context, req *models.BulkReorderRequest, userID primitive.ObjectID) error
 
 	// SubModule methods
 	CreateSubModule(ctx context.Context, moduleID primitive.ObjectID, req *models.CreateSubModuleRequest, userID primitive.ObjectID) (*models.SubModule, error)
@@ -400,6 +401,83 @@ func (s *moduleService) ReorderSubModules(ctx context.Context, moduleID primitiv
 
 	if err := s.moduleRepo.UpdateModule(ctx, module); err != nil {
 		return fmt.Errorf("failed to update submodule order: %w", err)
+	}
+
+	return nil
+}
+
+func (s *moduleService) BulkReorder(ctx context.Context, req *models.BulkReorderRequest, userID primitive.ObjectID) error {
+	// Handle module reordering
+	if len(req.ModuleUpdates) > 0 {
+		// Add user ID to each update
+		for i := range req.ModuleUpdates {
+			req.ModuleUpdates[i].UpdatedBy = userID
+		}
+
+		if err := s.moduleRepo.BulkUpdateModuleOrder(ctx, req.ModuleUpdates); err != nil {
+			return fmt.Errorf("failed to bulk update module order: %w", err)
+		}
+	}
+
+	// Handle submodule reordering
+	if len(req.SubModuleUpdates) > 0 {
+		// Group submodule updates by parent module
+		moduleSubModules := make(map[primitive.ObjectID][]models.SubModuleOrderUpdate)
+
+		for _, update := range req.SubModuleUpdates {
+			// We need to find the parent module for each submodule
+			// This requires querying each module to find which one contains the submodule
+			modules, _, err := s.moduleRepo.GetAllModules(ctx, &models.GetModulesRequest{Page: 1, Limit: 1000})
+			if err != nil {
+				return fmt.Errorf("failed to get modules for submodule reordering: %w", err)
+			}
+
+			var parentModuleID primitive.ObjectID
+			for _, module := range modules {
+				for _, subModule := range module.SubModules {
+					if subModule.ID == update.SubModuleID {
+						parentModuleID = module.ID
+						break
+					}
+				}
+				if !parentModuleID.IsZero() {
+					break
+				}
+			}
+
+			if parentModuleID.IsZero() {
+				return fmt.Errorf("parent module not found for submodule: %s", update.SubModuleID.Hex())
+			}
+
+			moduleSubModules[parentModuleID] = append(moduleSubModules[parentModuleID], update)
+		}
+
+		// Update each module's submodules
+		for moduleID, subModuleUpdates := range moduleSubModules {
+			module, err := s.moduleRepo.GetModuleByID(ctx, moduleID)
+			if err != nil {
+				return fmt.Errorf("failed to get module %s: %w", moduleID.Hex(), err)
+			}
+
+			// Update submodule orders
+			for _, update := range subModuleUpdates {
+				for i := range module.SubModules {
+					if module.SubModules[i].ID == update.SubModuleID {
+						module.SubModules[i].Order = update.Order
+						module.SubModules[i].UpdatedAt = time.Now()
+						module.SubModules[i].UpdatedBy = userID
+						break
+					}
+				}
+			}
+
+			module.UpdatedAt = time.Now()
+			module.UpdatedBy = userID
+
+			if err := s.moduleRepo.UpdateModule(ctx, module); err != nil {
+				return fmt.Errorf("failed to update module %s with reordered submodules: %w", moduleID.Hex(), err)
+			}
+		}
 	}
 
 	return nil

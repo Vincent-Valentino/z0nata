@@ -26,10 +26,9 @@ const (
 
 // Option represents a choice option for single/multiple choice questions
 type Option struct {
-	ID     string `json:"id" bson:"id"`
-	Text   string `json:"text" bson:"text"`
-	Order  int    `json:"order" bson:"order"`
-	Points int    `json:"points" bson:"points"` // Points for this specific option (useful for partial credit)
+	ID    string `json:"id" bson:"id"`
+	Text  string `json:"text" bson:"text"`
+	Order int    `json:"order" bson:"order"`
 }
 
 // Question represents a quiz question with support for different types
@@ -50,9 +49,6 @@ type Question struct {
 	// Essay-specific field
 	SampleAnswer string `json:"sample_answer,omitempty" bson:"sample_answer,omitempty"`
 
-	// Maximum points for essay (can be different from base points for partial credit)
-	MaxPoints int `json:"max_points,omitempty" bson:"max_points,omitempty"`
-
 	// Metadata
 	CreatedBy primitive.ObjectID `json:"created_by" bson:"created_by"`
 	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
@@ -70,13 +66,11 @@ type CreateQuestionRequest struct {
 	Options        []CreateOption  `json:"options,omitempty"`
 	CorrectAnswers []string        `json:"correct_answers,omitempty"`
 	SampleAnswer   string          `json:"sample_answer,omitempty"`
-	MaxPoints      int             `json:"max_points,omitempty"`
 }
 
 // CreateOption represents an option when creating a question
 type CreateOption struct {
-	Text   string `json:"text" binding:"required"`
-	Points int    `json:"points,omitempty"` // Points for this option (default: 0 for wrong, question.Points for correct)
+	Text string `json:"text" binding:"required"`
 }
 
 // UpdateQuestionRequest represents the request to update a question
@@ -88,7 +82,6 @@ type UpdateQuestionRequest struct {
 	Options        []CreateOption   `json:"options,omitempty"`
 	CorrectAnswers []string         `json:"correct_answers,omitempty"`
 	SampleAnswer   *string          `json:"sample_answer,omitempty"`
-	MaxPoints      *int             `json:"max_points,omitempty"`
 }
 
 // ListQuestionsRequest represents the request to list questions with filters
@@ -126,11 +119,10 @@ type QuestionStatsResponse struct {
 
 // QuestionForQuiz represents a question prepared for quiz (with shuffled options)
 type QuestionForQuiz struct {
-	ID        primitive.ObjectID `json:"id"`
-	Title     string             `json:"title"`
-	Type      QuestionType       `json:"type"`
-	Points    int                `json:"points"`
-	Options   []Option           `json:"options,omitempty"` // Shuffled options
-	MaxPoints int                `json:"max_points,omitempty"`
+	ID      primitive.ObjectID `json:"id"`
+	Title   string             `json:"title"`
+	Type    QuestionType       `json:"type"`
+	Points  int                `json:"points"`
+	Options []Option           `json:"options,omitempty"` // Shuffled options
 	// Note: CorrectAnswers are NOT included in quiz response for security
 }

@@ -260,14 +260,13 @@ export const MikroskilAuthForm = ({ onBack, onSubmit }: MikroskilAuthFormProps) 
             transition={{ delay: 0.6 }}
           >
             {authType === 'login' 
-              ? 'Masuk dengan NIM dan password Anda untuk mengakses platform pembelajaran eksklusif mahasiswa'
-              : 'Daftarkan akun mahasiswa Mikroskil untuk mendapatkan akses penuh platform pembelajaran AI'
+              ? 'Masuk dengan NIM dan password Anda untuk mengakses platform pembelajaran eksklusif mahasiswa Mikroskil'
+              : 'Daftarkan akun mahasiswa Mikroskil dengan NIM dan email institusi untuk mendapatkan akses penuh platform pembelajaran AI'
             }
           </motion.p>
           
           {/* Features List */}
           <motion.div 
-            className="space-y-3"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.7 }}

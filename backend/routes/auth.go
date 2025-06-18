@@ -177,10 +177,17 @@ func SetupAuthRoutes(router gin.IRouter, userController *controllers.UserControl
 
 	// Admin routes (use the shared admin group)
 	{
+		// User management
 		admin.GET("/users", userController.GetAllUsers)
-		admin.DELETE("/users/:id", userController.DeleteUser)
+		admin.GET("/users/stats", userController.GetUserStats)
+		admin.PUT("/users/:id/status", userController.UpdateUserStatus)
 
-		// Add more admin endpoints here
+		// Access request management
+		admin.GET("/access-requests", userController.GetAccessRequests)
+		admin.POST("/access-requests/:id/approve", userController.ApproveAccessRequest)
+		admin.POST("/access-requests/:id/reject", userController.RejectAccessRequest)
+
+		// Dashboard
 		admin.GET("/dashboard", func(c *gin.Context) {
 			c.JSON(200, gin.H{"message": "Admin dashboard"})
 		})

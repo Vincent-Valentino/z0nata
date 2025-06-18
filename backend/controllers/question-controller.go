@@ -13,13 +13,37 @@ import (
 )
 
 type QuestionController struct {
-	questionService services.QuestionService
+	questionService    services.QuestionService
+	activityLogService services.ActivityLogService
 }
 
-func NewQuestionController(questionService services.QuestionService) *QuestionController {
+func NewQuestionController(questionService services.QuestionService, activityLogService services.ActivityLogService) *QuestionController {
 	return &QuestionController{
-		questionService: questionService,
+		questionService:    questionService,
+		activityLogService: activityLogService,
 	}
+}
+
+// Helper method to get user information from context
+func (qc *QuestionController) getUserInfo(c *gin.Context) (string, string) {
+	userName := "Unknown User"
+	userType := "unknown"
+
+	// Try to get user name from context (if available)
+	if name, exists := c.Get("user_name"); exists {
+		if nameStr, ok := name.(string); ok {
+			userName = nameStr
+		}
+	}
+
+	// Try to get user type from context (if available)
+	if uType, exists := c.Get("user_type"); exists {
+		if typeStr, ok := uType.(string); ok {
+			userType = typeStr
+		}
+	}
+
+	return userName, userType
 }
 
 // @Summary Create a new question
@@ -55,6 +79,25 @@ func (qc *QuestionController) CreateQuestion(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Log question creation activity
+	go func() {
+		userName, userType := qc.getUserInfo(c)
+		qc.activityLogService.LogQuestionActivity(
+			c.Request.Context(),
+			models.ActivityQuestionCreated,
+			question.ID.Hex(),
+			question.Title,
+			userID,
+			userName,
+			userType,
+			map[string]interface{}{
+				"type":       question.Type,
+				"difficulty": question.Difficulty,
+				"points":     question.Points,
+			},
+		)
+	}()
 
 	c.JSON(http.StatusCreated, question)
 }
@@ -127,6 +170,36 @@ func (qc *QuestionController) UpdateQuestion(c *gin.Context) {
 		return
 	}
 
+	// Log question update activity
+	go func() {
+		userID, _ := middleware.GetUserID(c)
+		userName, userType := qc.getUserInfo(c)
+		changes := make(map[string]interface{})
+		if req.Title != nil {
+			changes["title"] = *req.Title
+		}
+		if req.Difficulty != nil {
+			changes["difficulty"] = *req.Difficulty
+		}
+		if req.Points != nil {
+			changes["points"] = *req.Points
+		}
+		if req.IsActive != nil {
+			changes["is_active"] = *req.IsActive
+		}
+
+		qc.activityLogService.LogQuestionActivity(
+			c.Request.Context(),
+			models.ActivityQuestionUpdated,
+			question.ID.Hex(),
+			question.Title,
+			userID,
+			userName,
+			userType,
+			changes,
+		)
+	}()
+
 	c.JSON(http.StatusOK, question)
 }
 
@@ -149,6 +222,17 @@ func (qc *QuestionController) DeleteQuestion(c *gin.Context) {
 		return
 	}
 
+	// Get question info before deletion for logging
+	question, err := qc.questionService.GetQuestion(c.Request.Context(), questionID)
+	if err != nil {
+		if err.Error() == "question not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get question"})
+		}
+		return
+	}
+
 	err = qc.questionService.DeleteQuestion(c.Request.Context(), questionID)
 	if err != nil {
 		if err.Error() == "question not found" {
@@ -158,6 +242,26 @@ func (qc *QuestionController) DeleteQuestion(c *gin.Context) {
 		}
 		return
 	}
+
+	// Log question deletion activity
+	go func() {
+		userID, _ := middleware.GetUserID(c)
+		userName, userType := qc.getUserInfo(c)
+		qc.activityLogService.LogQuestionActivity(
+			c.Request.Context(),
+			models.ActivityQuestionDeleted,
+			question.ID.Hex(),
+			question.Title,
+			userID,
+			userName,
+			userType,
+			map[string]interface{}{
+				"type":       question.Type,
+				"difficulty": question.Difficulty,
+				"points":     question.Points,
+			},
+		)
+	}()
 
 	c.JSON(http.StatusOK, gin.H{"message": "Question deleted successfully"})
 }
@@ -289,6 +393,29 @@ func (qc *QuestionController) ToggleQuestionStatus(c *gin.Context) {
 		return
 	}
 
+	// Log question status toggle activity
+	go func() {
+		userID, _ := middleware.GetUserID(c)
+		userName, userType := qc.getUserInfo(c)
+		activityType := models.ActivityQuestionActivated
+		if !req.IsActive {
+			activityType = models.ActivityQuestionDeactivated
+		}
+
+		qc.activityLogService.LogQuestionActivity(
+			c.Request.Context(),
+			activityType,
+			question.ID.Hex(),
+			question.Title,
+			userID,
+			userName,
+			userType,
+			map[string]interface{}{
+				"is_active": req.IsActive,
+			},
+		)
+	}()
+
 	c.JSON(http.StatusOK, question)
 }
 
@@ -337,12 +464,11 @@ func (qc *QuestionController) GetRandomQuestions(c *gin.Context) {
 	quizQuestions := make([]models.QuestionForQuiz, len(questions))
 	for i, q := range questions {
 		quizQuestions[i] = models.QuestionForQuiz{
-			ID:        q.ID,
-			Title:     q.Title,
-			Type:      q.Type,
-			Points:    q.Points,
-			Options:   q.Options,
-			MaxPoints: q.MaxPoints,
+			ID:      q.ID,
+			Title:   q.Title,
+			Type:    q.Type,
+			Points:  q.Points,
+			Options: q.Options,
 		}
 	}
 

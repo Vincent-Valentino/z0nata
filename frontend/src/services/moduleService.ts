@@ -7,6 +7,7 @@ export interface Module {
   description: string
   content: string
   is_published: boolean
+  order: number
   sub_modules: SubModule[]
   created_at: string
   updated_at: string
@@ -20,6 +21,7 @@ export interface SubModule {
   description: string
   content: string
   is_published: boolean
+  order: number
   created_at: string
   updated_at: string
   created_by: string
@@ -59,6 +61,32 @@ export interface GetModulesResponse {
   page: number
   limit: number
   total_pages: number
+}
+
+// Order update interfaces for drag-and-drop functionality
+export interface ModuleOrderUpdate {
+  module_id: string
+  order: number
+}
+
+export interface SubModuleOrderUpdate {
+  submodule_id: string
+  order: number
+}
+
+export interface BulkReorderRequest {
+  module_updates?: ModuleOrderUpdate[]
+  submodule_updates?: SubModuleOrderUpdate[]
+}
+
+// Drag and drop item interface
+export interface DragDropItem {
+  id: string
+  type: 'module' | 'submodule'
+  parentId?: string
+  order: number
+  title: string
+  isPublished: boolean
 }
 
 // Module Service
@@ -125,12 +153,74 @@ export const moduleService = {
 
   // Reorder modules (Admin only)
   reorderModules: async (moduleIds: string[]): Promise<void> => {
+    console.log('Reordering modules:', moduleIds)
     return api.post<void>('/admin/modules/reorder', { module_ids: moduleIds })
   },
 
   // Reorder submodules (Admin only)
   reorderSubModules: async (moduleId: string, subModuleIds: string[]): Promise<void> => {
+    console.log('Reordering submodules:', { moduleId, subModuleIds })
     return api.post<void>(`/admin/modules/${moduleId}/submodules/reorder`, { submodule_ids: subModuleIds })
+  },
+
+  // Bulk reorder modules and submodules (Admin only)
+  bulkReorder: async (data: BulkReorderRequest): Promise<void> => {
+    return api.post<void>('/admin/modules/bulk-reorder', data)
+  },
+
+  // Helper function to convert modules to drag-drop items
+  convertToDragDropItems: (modules: Module[]): DragDropItem[] => {
+    const items: DragDropItem[] = []
+    
+    modules.forEach(module => {
+      // Add module
+      items.push({
+        id: module.id,
+        type: 'module',
+        order: module.order || 0,
+        title: module.name,
+        isPublished: module.is_published
+      })
+      
+      // Add submodules
+      if (module.sub_modules) {
+        module.sub_modules.forEach(subModule => {
+          items.push({
+            id: subModule.id,
+            type: 'submodule',
+            parentId: module.id,
+            order: subModule.order || 0,
+            title: subModule.name,
+            isPublished: subModule.is_published
+          })
+        })
+      }
+    })
+    
+    return items.sort((a, b) => {
+      // Sort modules first, then submodules within each module
+      if (a.type === 'module' && b.type === 'module') {
+        return a.order - b.order
+      }
+      if (a.type === 'submodule' && b.type === 'submodule') {
+        if (a.parentId === b.parentId) {
+          return a.order - b.order
+        }
+        // Different parents, maintain module order
+        const moduleA = modules.find(m => m.id === a.parentId)
+        const moduleB = modules.find(m => m.id === b.parentId)
+        return (moduleA?.order || 0) - (moduleB?.order || 0)
+      }
+      // Module comes before its submodules
+      if (a.type === 'module' && b.type === 'submodule' && b.parentId === a.id) {
+        return -1
+      }
+      if (b.type === 'module' && a.type === 'submodule' && a.parentId === b.id) {
+        return 1
+      }
+      // General module vs submodule ordering
+      return a.type === 'module' ? -1 : 1
+    })
   },
 }
 

@@ -6,7 +6,6 @@ export interface Option {
   id: string
   text: string
   order: number
-  points: number
 }
 
 export interface Question {
@@ -19,7 +18,6 @@ export interface Question {
   options?: Option[]
   correct_answers?: string[]
   sample_answer?: string
-  max_points?: number
   created_by: string
   created_at: string
   updated_at: string
@@ -34,12 +32,10 @@ export interface CreateQuestionRequest {
   options?: CreateOption[]
   correct_answers?: string[]
   sample_answer?: string
-  max_points?: number
 }
 
 export interface CreateOption {
   text: string
-  points?: number
 }
 
 export interface UpdateQuestionRequest {
@@ -50,7 +46,6 @@ export interface UpdateQuestionRequest {
   options?: CreateOption[]
   correct_answers?: string[]
   sample_answer?: string
-  max_points?: number
 }
 
 export interface ListQuestionsRequest {
@@ -94,7 +89,6 @@ export interface QuestionDisplay {
   options?: Option[]
   correctAnswers?: string[]
   sampleAnswer?: string
-  maxPoints?: number
   createdBy: string
   createdAt: string
   updatedAt: string
@@ -111,7 +105,6 @@ export const convertQuestionToDisplay = (question: Question): QuestionDisplay =>
   options: question.options,
   correctAnswers: question.correct_answers,
   sampleAnswer: question.sample_answer,
-  maxPoints: question.max_points,
   createdBy: question.created_by,
   createdAt: question.created_at,
   updatedAt: question.updated_at
@@ -122,28 +115,50 @@ export const convertDisplayToRequest = (question: Partial<QuestionDisplay>): Cre
   type: question.type || 'single_choice',
   difficulty: question.difficulty || 'medium',
   points: question.points || 10,
-  options: question.options?.map(opt => ({ text: opt.text, points: opt.points })),
+  options: question.options?.map(opt => ({ text: opt.text })),
   correct_answers: question.correctAnswers,
-  sample_answer: question.sampleAnswer,
-  max_points: question.maxPoints
+  sample_answer: question.sampleAnswer
 })
 
 // Question Service
 export const questionService = {
   // Get all questions with filtering and pagination
   async getQuestions(params?: ListQuestionsRequest): Promise<ListQuestionsResponse> {
-    const searchParams = new URLSearchParams()
-    
-    if (params?.page) searchParams.append('page', params.page.toString())
-    if (params?.limit) searchParams.append('limit', params.limit.toString())
-    if (params?.search) searchParams.append('search', params.search)
-    if (params?.type) searchParams.append('type', params.type)
-    if (params?.difficulty) searchParams.append('difficulty', params.difficulty)
-    if (params?.is_active !== undefined) searchParams.append('is_active', params.is_active.toString())
+    try {
+      const searchParams = new URLSearchParams()
+      
+      if (params?.page) searchParams.append('page', params.page.toString())
+      if (params?.limit) searchParams.append('limit', params.limit.toString())
+      if (params?.search) searchParams.append('search', params.search)
+      if (params?.type) searchParams.append('type', params.type)
+      if (params?.difficulty) searchParams.append('difficulty', params.difficulty)
+      if (params?.is_active !== undefined) searchParams.append('is_active', params.is_active.toString())
 
-    const query = searchParams.toString()
-    const response = await api.get<ListQuestionsResponse>(`/admin/questions${query ? `?${query}` : ''}`)
-    return response
+      const query = searchParams.toString()
+      const response = await api.get<ListQuestionsResponse>(`/admin/questions${query ? `?${query}` : ''}`)
+      
+      // Ensure we always return a valid structure
+      return {
+        questions: response?.questions || [],
+        total: response?.total || 0,
+        page: response?.page || 1,
+        limit: response?.limit || 20,
+        total_pages: response?.total_pages || 1
+      }
+    } catch (error: any) {
+      // Re-throw with more context for the component to handle
+      if (error.response?.status === 404) {
+        // Return empty result for 404 instead of throwing
+        return {
+          questions: [],
+          total: 0,
+          page: 1,
+          limit: 20,
+          total_pages: 1
+        }
+      }
+      throw error
+    }
   },
 
   // Get question by ID

@@ -10,7 +10,8 @@ export { AlertDialog, AlertDialogPortal, AlertDialogOverlay, AlertDialogTrigger,
 export { Progress } from './progress'
 export { Avatar, AvatarImage, AvatarFallback } from './avatar'
 export { Separator } from './separator'
-export { Dialog, DialogPortal, DialogOverlay, DialogTrigger, DialogClose, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from './dialog'
+export { ScrollArea } from './scroll-area'
+export { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription, DialogTrigger } from './dialog'
 export { 
   Navbar, 
   NavBody, 
@@ -23,4 +24,5 @@ export {
   NavbarButton 
 } from './resizable-navbar'
 export { Tooltip } from './Tooltip'
-export { Command, CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandShortcut, CommandSeparator } from './command' 
+export { Command, CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandShortcut, CommandSeparator } from './command'
+export { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuCheckboxItem, DropdownMenuRadioItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuGroup, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuRadioGroup } from './dropdown-menu' 
