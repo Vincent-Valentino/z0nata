@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useAuthStore, loginAsAdminDirect, loginAsStudentDirect, getAdminUser, getStudentUser, handleOAuthLogin } from '@/store/authStore'
+import { useAuthStore, loginAsAdminDirect, loginAsStudentDirect, loginAsUserDirect, getAdminUser, getStudentUser, handleOAuthLogin } from '@/store/authStore'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -79,6 +79,15 @@ export const DevToolsPanel = () => {
   const adminUser = getAdminUser()
   const studentUser = getStudentUser()
 
+  const regularUser = {
+    id: '507f1f77bcf86cd799439013',
+    full_name: 'Johnny Tester',
+    email: 'johnny.tester@user.com',
+    role: 'user',
+    password: 'user123',
+    description: 'Regular Account - Basic user access'
+  }
+
   const mockUsers = [
     {
       ...adminUser,
@@ -89,21 +98,28 @@ export const DevToolsPanel = () => {
       ...studentUser,
       password: 'student123',
       description: 'Student Account - Regular user access'
-    }
+    },
+    regularUser
   ]
 
-  const handleQuickLogin = async (userType: 'admin' | 'student') => {
+  const handleQuickLogin = async (userType: 'admin' | 'student' | 'user') => {
     console.log(`🔄 Starting ${userType} login...`)
     try {
       if (userType === 'admin') {
         const success = await loginAsAdminDirect()
         if (success) {
           console.log('✅ Admin login successful')
-          // Test API call immediately after login
+          // Test API call immediately after login to verify token works
           setTimeout(async () => {
             try {
               const token = useAuthStore.getState().token
               console.log('🧪 Testing API with token:', token ? `${token.slice(0, 20)}...` : 'null')
+              
+              if (token && token.includes('mock-')) {
+                console.warn('⚠️ Using mock token - API calls may fail')
+                return
+              }
+              
               const result = await api.get('/admin/questions/stats')
               console.log('✅ API test successful:', result)
             } catch (error) {
@@ -113,12 +129,17 @@ export const DevToolsPanel = () => {
         } else {
           console.warn('⚠️ Admin login failed, using fallback')
         }
-      } else {
+      } else if (userType === 'student') {
         const success = await loginAsStudentDirect()
         if (success) {
           console.log('✅ Student login successful')
         } else {
           console.warn('⚠️ Student login failed, using fallback')
+        }
+      } else {
+        const success = await loginAsUserDirect()
+        if (success) {
+          console.log('✅ User login successful')
         }
       }
     } catch (error) {
@@ -131,6 +152,27 @@ export const DevToolsPanel = () => {
     setApiTestResult(null)
     
     try {
+      // Check auth state before testing
+      const { token, isAuthenticated } = useAuthStore.getState()
+      
+      if (!isAuthenticated || !token) {
+        setApiTestResult({
+          success: false,
+          error: 'Not authenticated - please login first',
+          status: 'error'
+        })
+        return
+      }
+      
+      if (token.includes('mock-')) {
+        setApiTestResult({
+          success: false,
+          error: 'Using mock token - API calls will fail. Use "Force Fresh Admin Login"',
+          status: 'error'
+        })
+        return
+      }
+      
       const startTime = Date.now()
       let result
       
@@ -220,18 +262,18 @@ export const DevToolsPanel = () => {
 
   return (
     <div className={cn(
-      "fixed bottom-4 right-4 z-50 transition-all duration-300 ease-in-out",
-      "w-120 bg-background border border-border rounded-lg shadow-2xl",
-      isExpanded ? "h-100" : "h-12"
+      "fixed bottom-2 right-2 sm:bottom-4 sm:right-4 z-50 transition-all duration-300 ease-in-out",
+      "w-[calc(100vw-1rem)] sm:w-120 bg-background border border-border rounded-lg shadow-2xl max-w-md sm:max-w-none",
+      isExpanded ? "h-[80vh] sm:h-100" : "h-12"
     )}>
       {/* Header */}
       <div 
-        className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
+        className="flex items-center justify-between p-2 sm:p-3 cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg touch-manipulation"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-          <span className="text-sm font-medium">Dev Tools</span>
+          <span className="text-xs sm:text-sm font-medium">Dev Tools</span>
           <Badge variant="secondary" className="text-xs">
             {process.env.NODE_ENV}
           </Badge>
@@ -245,14 +287,14 @@ export const DevToolsPanel = () => {
 
       {/* Expanded Content */}
       {isExpanded && (
-        <div className="p-3 pt-0 h-80 overflow-hidden">
+        <div className="p-2 sm:p-3 pt-0 h-[calc(100%-3rem)] overflow-hidden">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
-            <TabsList className="grid w-full grid-cols-5 mb-3">
+            <TabsList className="grid w-full grid-cols-5 mb-2 sm:mb-3 h-8 sm:h-10">
               {tabs.map((tab) => (
                 <TabsTrigger 
                   key={tab.id} 
                   value={tab.id}
-                  className="flex items-center gap-1 text-xs"
+                  className="flex items-center gap-1 text-xs px-1 sm:px-3 touch-manipulation"
                 >
                   <tab.icon className="w-3 h-3" />
                   <span className="hidden sm:inline">{tab.label}</span>
@@ -261,24 +303,24 @@ export const DevToolsPanel = () => {
             </TabsList>
 
             {/* Auth Tab */}
-            <TabsContent value="auth" className="space-y-3 h-60 overflow-y-auto">
+            <TabsContent value="auth" className="space-y-2 sm:space-y-3 h-[calc(100%-2.5rem)] sm:h-60 overflow-y-auto">
               <Card>
-                <CardHeader className="pb-2">
+                <CardHeader className="pb-2 px-3 pt-3">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <User className="w-4 h-4" />
                     Current User
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2">
+                <CardContent className="space-y-2 px-3 pb-3">
                   {isAuthenticated && user ? (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">Name:</span>
-                        <span className="text-xs font-medium">{user.full_name}</span>
+                        <span className="text-xs font-medium truncate ml-2">{user.full_name}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">Email:</span>
-                        <span className="text-xs font-medium">{user.email}</span>
+                        <span className="text-xs font-medium truncate ml-2">{user.email}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">Role:</span>
@@ -286,11 +328,20 @@ export const DevToolsPanel = () => {
                           {user.role}
                         </Badge>
                       </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Token:</span>
+                        <Badge 
+                          variant={useAuthStore.getState().token?.includes('mock-') ? 'destructive' : 'default'} 
+                          className="text-xs"
+                        >
+                          {useAuthStore.getState().token?.includes('mock-') ? 'Mock (Invalid)' : 'Valid'}
+                        </Badge>
+                      </div>
                       <Button 
                         onClick={logout} 
                         variant="destructive" 
                         size="sm" 
-                        className="w-full mt-2"
+                        className="w-full mt-2 touch-manipulation"
                       >
                         Logout
                       </Button>
@@ -305,32 +356,32 @@ export const DevToolsPanel = () => {
               </Card>
 
               <Card>
-                <CardHeader className="pb-2">
+                <CardHeader className="pb-2 px-3 pt-3">
                   <CardTitle className="text-sm">Quick Login</CardTitle>
                   <CardDescription className="text-xs">
                     Switch between test accounts
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-2">
+                <CardContent className="space-y-2 px-3 pb-3">
                   {mockUsers.map((mockUser, index) => (
                     <div key={index} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
                           {mockUser.role === 'admin' ? (
-                            <Shield className="w-4 h-4 text-blue-500" />
+                            <Shield className="w-4 h-4 text-blue-500 shrink-0" />
                           ) : (
-                            <User className="w-4 h-4 text-green-500" />
+                            <User className="w-4 h-4 text-green-500 shrink-0" />
                           )}
-                          <div>
-                            <p className="text-xs font-medium">{mockUser.full_name}</p>
-                            <p className="text-xs text-muted-foreground">{mockUser.description}</p>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-medium truncate">{mockUser.full_name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{mockUser.description}</p>
                           </div>
                         </div>
                         <Button
-                          onClick={() => handleQuickLogin(mockUser.role as 'admin' | 'student')}
+                          onClick={() => handleQuickLogin(mockUser.role as 'admin' | 'student' | 'user')}
                           size="sm"
                           variant="outline"
-                          className="text-xs"
+                          className="text-xs touch-manipulation shrink-0"
                         >
                           Login
                         </Button>
@@ -343,31 +394,31 @@ export const DevToolsPanel = () => {
             </TabsContent>
 
             {/* API Test Tab */}
-            <TabsContent value="api" className="space-y-3 h-60 overflow-y-auto">
+            <TabsContent value="api" className="space-y-2 sm:space-y-3 h-[calc(100%-2.5rem)] sm:h-60 overflow-y-auto">
               <Card>
-                <CardHeader className="pb-2">
+                <CardHeader className="pb-2 px-3 pt-3">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <TestTube className="w-4 h-4" />
                     API Testing
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2">
+                <CardContent className="space-y-2 px-3 pb-3">
                   {/* Category Filter */}
-                  <div className="flex gap-1 mb-2 overflow-x-auto">
+                  <div className="flex gap-1 mb-2 overflow-x-auto pb-1">
                     {categories.map((category) => (
                       <Button
                         key={category}
                         onClick={() => setSelectedCategory(category)}
                         variant={selectedCategory === category ? "default" : "outline"}
                         size="sm"
-                        className="text-xs whitespace-nowrap"
+                        className="text-xs whitespace-nowrap touch-manipulation"
                       >
                         {category}
                       </Button>
                     ))}
                   </div>
                   
-                  <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto">
+                  <div className="grid grid-cols-1 gap-2 max-h-32 sm:max-h-40 overflow-y-auto">
                     {filteredEndpoints.map((endpoint, index) => (
                       <Button
                         key={index}
@@ -375,7 +426,7 @@ export const DevToolsPanel = () => {
                         disabled={isTestingAPI}
                         variant="outline"
                         size="sm"
-                        className="justify-start text-xs"
+                        className="justify-start text-xs touch-manipulation"
                       >
                         {isTestingAPI ? (
                           <RefreshCw className="w-3 h-3 mr-2 animate-spin" />
@@ -385,7 +436,7 @@ export const DevToolsPanel = () => {
                         <Badge variant="secondary" className="text-xs mr-2">
                           {endpoint.method}
                         </Badge>
-                        {endpoint.label}
+                        <span className="truncate">{endpoint.label}</span>
                       </Button>
                     ))}
                   </div>
@@ -394,7 +445,7 @@ export const DevToolsPanel = () => {
 
               {apiTestResult && (
                 <Card>
-                  <CardHeader className="pb-2">
+                  <CardHeader className="pb-2 px-3 pt-3">
                     <CardTitle className="text-sm flex items-center gap-2">
                       {apiTestResult.success ? (
                         <CheckCircle2 className="w-4 h-4 text-green-500" />
@@ -410,14 +461,14 @@ export const DevToolsPanel = () => {
                       )}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="bg-muted rounded-md p-2 text-xs font-mono max-h-32 overflow-y-auto">
+                  <CardContent className="px-3 pb-3">
+                    <div className="bg-muted rounded-md p-2 text-xs font-mono max-h-24 sm:max-h-32 overflow-y-auto">
                       {apiTestResult.success ? (
-                        <pre className="text-green-700 dark:text-green-400">
+                        <pre className="text-green-700 dark:text-green-400 whitespace-pre-wrap break-all">
                           {JSON.stringify(apiTestResult.data, null, 2)}
                         </pre>
                       ) : (
-                        <pre className="text-red-700 dark:text-red-400">
+                        <pre className="text-red-700 dark:text-red-400 whitespace-pre-wrap break-all">
                           Error: {apiTestResult.error}
                         </pre>
                       )}
@@ -428,9 +479,9 @@ export const DevToolsPanel = () => {
             </TabsContent>
 
             {/* OAuth Test Tab */}
-            <TabsContent value="oauth" className="space-y-3 h-60 overflow-y-auto">
+            <TabsContent value="oauth" className="space-y-2 sm:space-y-3 h-[calc(100%-2.5rem)] sm:h-60 overflow-y-auto">
               <Card>
-                <CardHeader className="pb-2">
+                <CardHeader className="pb-2 px-3 pt-3">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Globe className="w-4 h-4" />
                     OAuth Testing
@@ -439,14 +490,14 @@ export const DevToolsPanel = () => {
                     Test OAuth login with different providers
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-2">
+                <CardContent className="space-y-2 px-3 pb-3">
                   <div className="grid grid-cols-1 gap-2">
                     {oauthProviders.map((provider) => (
                       <div key={provider.id} className="space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-medium flex items-center gap-2">
                             <span>{provider.icon}</span>
-                            {provider.name}
+                            <span className="truncate">{provider.name}</span>
                           </span>
                         </div>
                         <div className="flex gap-1">
@@ -455,7 +506,7 @@ export const DevToolsPanel = () => {
                             disabled={isTestingAuth}
                             variant="outline"
                             size="sm"
-                            className="flex-1 text-xs"
+                            className="flex-1 text-xs touch-manipulation"
                           >
                             {isTestingAuth ? (
                               <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
@@ -469,7 +520,7 @@ export const DevToolsPanel = () => {
                             disabled={isTestingAuth}
                             variant="outline"
                             size="sm"
-                            className="flex-1 text-xs"
+                            className="flex-1 text-xs touch-manipulation"
                           >
                             {isTestingAuth ? (
                               <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
@@ -487,7 +538,7 @@ export const DevToolsPanel = () => {
 
               {authTestResult && (
                 <Card>
-                  <CardHeader className="pb-2">
+                  <CardHeader className="pb-2 px-3 pt-3">
                     <CardTitle className="text-sm flex items-center gap-2">
                       {authTestResult.success ? (
                         <CheckCircle2 className="w-4 h-4 text-green-500" />
@@ -503,9 +554,9 @@ export const DevToolsPanel = () => {
                       )}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="px-3 pb-3">
                     <div className="bg-muted rounded-md p-2 text-xs">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <Badge variant="outline">{authTestResult.provider}</Badge>
                         <Badge variant="outline">{authTestResult.userType}</Badge>
                       </div>
@@ -519,35 +570,35 @@ export const DevToolsPanel = () => {
             </TabsContent>
 
             {/* System Tab */}
-            <TabsContent value="system" className="space-y-3 h-60 overflow-y-auto">
+            <TabsContent value="system" className="space-y-2 sm:space-y-3 h-[calc(100%-2.5rem)] sm:h-60 overflow-y-auto">
               <Card>
-                <CardHeader className="pb-2">
+                <CardHeader className="pb-2 px-3 pt-3">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Database className="w-4 h-4" />
                     System Info
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
+                <CardContent className="space-y-2 px-3 pb-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Environment:</span>
-                      <Badge variant="outline" className="ml-2">
+                      <Badge variant="outline" className="text-xs">
                         {process.env.NODE_ENV}
                       </Badge>
                     </div>
-                    <div>
+                    <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">API Base:</span>
-                      <span className="ml-2 font-mono">localhost:8080</span>
+                      <span className="font-mono text-xs truncate ml-2">localhost:8080</span>
                     </div>
-                    <div>
+                    <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Auth Status:</span>
-                      <Badge variant={isAuthenticated ? "default" : "secondary"} className="ml-2">
+                      <Badge variant={isAuthenticated ? "default" : "secondary"} className="text-xs">
                         {isAuthenticated ? "Authenticated" : "Not Authenticated"}
                       </Badge>
                     </div>
-                    <div>
+                    <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Local Storage:</span>
-                      <span className="ml-2 font-mono">{localStorage.length} items</span>
+                      <span className="font-mono text-xs">{localStorage.length} items</span>
                     </div>
                   </div>
                 </CardContent>
@@ -555,25 +606,25 @@ export const DevToolsPanel = () => {
 
               {isAuthenticated && user && (
                 <Card>
-                  <CardHeader className="pb-2">
+                  <CardHeader className="pb-2 px-3 pt-3">
                     <CardTitle className="text-sm">Auth Token</CardTitle>
                     <CardDescription className="text-xs">
                       Current JWT token (click to copy)
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="px-3 pb-3">
                     <Button
                       onClick={() => copyToClipboard(user.id)}
                       variant="outline"
                       size="sm"
-                      className="w-full justify-start text-xs font-mono"
+                      className="w-full justify-start text-xs font-mono touch-manipulation"
                     >
                       {copiedToken ? (
                         <Check className="w-3 h-3 mr-2 text-green-500" />
                       ) : (
                         <Copy className="w-3 h-3 mr-2" />
                       )}
-                      {user.id.slice(0, 20)}...
+                      <span className="truncate">{user.id.slice(0, 20)}...</span>
                     </Button>
                   </CardContent>
                 </Card>
@@ -581,34 +632,50 @@ export const DevToolsPanel = () => {
             </TabsContent>
 
             {/* Settings Tab */}
-            <TabsContent value="settings" className="space-y-3 h-60 overflow-y-auto">
+            <TabsContent value="settings" className="space-y-2 sm:space-y-3 h-[calc(100%-2.5rem)] sm:h-60 overflow-y-auto">
               <Card>
-                <CardHeader className="pb-2">
+                <CardHeader className="pb-2 px-3 pt-3">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Settings className="w-4 h-4" />
                     Dev Settings
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2">
+                <CardContent className="space-y-2 px-3 pb-3">
                   <Button
                     onClick={() => localStorage.clear()}
                     variant="outline"
                     size="sm"
-                    className="w-full text-xs"
+                    className="w-full text-xs touch-manipulation"
                   >
                     Clear Local Storage
                   </Button>
                   <Button
-                    onClick={() => {
-                      logout()
+                    onClick={async () => {
+                      console.log('🔄 Force Fresh Admin Login...')
+                      await logout()
+                      localStorage.removeItem('auth-storage')
                       setTimeout(async () => {
-                        console.log('🔄 Manual dev login test...')
-                        await loginAsAdminDirect()
+                        const success = await loginAsAdminDirect()
+                        if (success) {
+                          console.log('✅ Fresh admin login successful')
+                          // Test API immediately
+                          setTimeout(async () => {
+                            try {
+                              const token = useAuthStore.getState().token
+                              if (token && !token.includes('mock-')) {
+                                const result = await api.get('/admin/questions/stats')
+                                console.log('✅ API validation successful:', result)
+                              }
+                            } catch (error) {
+                              console.error('❌ API validation failed:', error)
+                            }
+                          }, 500)
+                        }
                       }, 100)
                     }}
                     variant="outline"
                     size="sm"
-                    className="w-full text-xs"
+                    className="w-full text-xs touch-manipulation"
                   >
                     Force Fresh Admin Login
                   </Button>
@@ -616,7 +683,7 @@ export const DevToolsPanel = () => {
                     onClick={() => window.location.reload()}
                     variant="outline"
                     size="sm"
-                    className="w-full text-xs"
+                    className="w-full text-xs touch-manipulation"
                   >
                     Reload Page
                   </Button>
@@ -627,7 +694,7 @@ export const DevToolsPanel = () => {
                     }}
                     variant="outline"
                     size="sm"
-                    className="w-full text-xs"
+                    className="w-full text-xs touch-manipulation"
                   >
                     Clear All Test Results
                   </Button>
@@ -645,23 +712,35 @@ export const DevToolsPanel = () => {
                     }}
                     variant="outline"
                     size="sm"
-                    className="w-full text-xs"
+                    className="w-full text-xs touch-manipulation"
                   >
                     Test OAuth URL Generation
                   </Button>
                   <Button
                     onClick={() => {
-                      const token = useAuthStore.getState().token
+                      const { token, user, isAuthenticated } = useAuthStore.getState()
                       if (token) {
-                        console.log('Current JWT Token:', token)
-                        console.log('Token payload:', JSON.parse(atob(token.split('.')[1])))
+                        console.log('🔍 Auth Debug Info:')
+                        console.log('- Is Authenticated:', isAuthenticated)
+                        console.log('- User:', user)
+                        console.log('- Token (first 30 chars):', token.slice(0, 30) + '...')
+                        console.log('- Is Mock Token:', token.includes('mock-'))
+                        
+                        if (!token.includes('mock-')) {
+                          try {
+                            const payload = JSON.parse(atob(token.split('.')[1]))
+                            console.log('- Token payload:', payload)
+                          } catch (e) {
+                            console.log('- Token payload: Unable to decode')
+                          }
+                        }
                       } else {
-                        console.log('No token available')
+                        console.log('🔍 Auth Debug: No token available')
                       }
                     }}
                     variant="outline"
                     size="sm"
-                    className="w-full text-xs"
+                    className="w-full text-xs touch-manipulation"
                   >
                     Debug JWT Token
                   </Button>

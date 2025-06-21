@@ -89,7 +89,7 @@ export const RegularAuthForm = ({ onBack, onSubmit }: RegularAuthFormProps) => {
 
   return (
     <motion.div 
-      className="min-h-screen flex"
+      className="min-h-screen flex overflow-hidden"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -97,7 +97,7 @@ export const RegularAuthForm = ({ onBack, onSubmit }: RegularAuthFormProps) => {
     >
       {/* Left side - Form */}
       <motion.div 
-        className="flex-1 flex flex-col justify-center px-8 sm:px-12 lg:px-16 bg-white lg:py-16"
+        className="flex-1 flex flex-col justify-center px-4 sm:px-8 lg:px-12 xl:px-16 bg-white py-8 lg:py-16 min-h-screen lg:min-h-0"
         initial={{ x: -100, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ delay: 0.2, duration: 0.6 }}
@@ -121,14 +121,14 @@ export const RegularAuthForm = ({ onBack, onSubmit }: RegularAuthFormProps) => {
             <Button 
               variant="ghost" 
               onClick={onBack}
-              className="mb-6 -ml-2 hover:bg-gray-100 transition-colors duration-200"
+              className="mb-4 sm:mb-6 -ml-2 hover:bg-gray-100 transition-colors duration-200 touch-manipulation"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Kembali
             </Button>
             
             <motion.h1 
-              className="text-3xl font-bold text-gray-900 mb-2"
+              className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.7 }}
@@ -136,7 +136,7 @@ export const RegularAuthForm = ({ onBack, onSubmit }: RegularAuthFormProps) => {
               {authType === 'login' ? 'Masuk Akun' : 'Daftar Akun'}
             </motion.h1>
             <motion.p 
-              className="text-gray-600"
+              className="text-gray-600 text-sm sm:text-base leading-relaxed"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.8 }}
@@ -169,7 +169,7 @@ export const RegularAuthForm = ({ onBack, onSubmit }: RegularAuthFormProps) => {
 
           {/* Auth Type Toggle */}
           <motion.div 
-            className="flex rounded-lg bg-gray-100 p-1 gap-1 mb-6"
+            className="flex rounded-lg bg-gray-100 p-1 gap-1 mb-4 sm:mb-6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.9 }}
@@ -178,7 +178,7 @@ export const RegularAuthForm = ({ onBack, onSubmit }: RegularAuthFormProps) => {
               type="button"
               variant={authType === 'login' ? "default" : "ghost"}
               onClick={() => handleAuthTypeChange('login')}
-              className={`flex-1 h-10 text-sm font-medium transition-all ${
+              className={`flex-1 h-10 sm:h-11 text-sm font-medium transition-all touch-manipulation ${
                 authType === 'login' 
                   ? 'bg-white shadow-sm text-gray-900' 
                   : 'bg-neutral-100 text-gray-600 hover:bg-white hover:text-gray-800'
@@ -190,7 +190,7 @@ export const RegularAuthForm = ({ onBack, onSubmit }: RegularAuthFormProps) => {
               type="button"
               variant={authType === 'register' ? "default" : "ghost"}
               onClick={() => handleAuthTypeChange('register')}
-              className={`flex-1 h-10 text-sm font-medium transition-all ${
+              className={`flex-1 h-10 sm:h-11 text-sm font-medium transition-all touch-manipulation ${
                 authType === 'register' 
                   ? 'bg-white shadow-sm text-gray-900' 
                   : 'bg-neutral-100 text-gray-600 hover:bg-white hover:text-gray-800'

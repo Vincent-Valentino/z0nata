@@ -195,10 +195,14 @@ export const useLoginAsStudent = () => {
 
 // Direct login functions that don't use hooks (safe to call anywhere)
 export const loginAsAdminDirect = async () => {
-  const { login } = useAuthStore.getState()
+  const { login, logout } = useAuthStore.getState()
   
   try {
     console.log('🔗 Making request to development admin login endpoint...')
+    
+    // Clear any existing auth state first
+    await logout()
+    
     // Use the development admin login endpoint that generates real JWT tokens
     const loginResponse = await fetch('http://localhost:8080/api/v1/dev/login-admin', {
       method: 'POST',
@@ -212,6 +216,11 @@ export const loginAsAdminDirect = async () => {
     if (loginResponse.ok) {
       const data = await loginResponse.json()
       console.log('✅ Development admin login response:', data)
+      
+      // Validate the response has required fields
+      if (!data.access_token || !data.user) {
+        throw new Error('Invalid response from dev login endpoint')
+      }
       
       // Map backend user data to frontend User interface
       const user: User = {
@@ -241,21 +250,38 @@ export const loginAsAdminDirect = async () => {
 
       login(user, data.access_token, data.refresh_token)
       console.log('✅ Admin login successful with real JWT token from dev endpoint')
+      
+      // Validate token immediately
+      setTimeout(async () => {
+        try {
+          const testResponse = await fetch('http://localhost:8080/api/v1/admin/questions/stats', {
+            headers: {
+              'Authorization': `Bearer ${data.access_token}`,
+              'Content-Type': 'application/json'
+            }
+          })
+          if (testResponse.ok) {
+            console.log('✅ Token validation successful')
+          } else {
+            console.warn('⚠️ Token validation failed:', testResponse.status)
+          }
+        } catch (error) {
+          console.warn('⚠️ Token validation error:', error)
+        }
+      }, 500)
+      
       return true
     } else {
       const errorText = await loginResponse.text()
       console.error('❌ Development admin login failed:', loginResponse.status, errorText)
-      // Fallback to mock user with fake token
-      console.warn('⚠️  Backend dev login failed, using mock admin user')
-      const mockUser = getAdminUser()
-      login(mockUser, 'mock-admin-token-' + Date.now())
+      
+      // Don't fallback to mock - let user know they need to fix the backend
+      console.error('⚠️ Backend dev login failed - mock tokens won\'t work with API')
       return false
     }
   } catch (error) {
-    console.error('Admin login error:', error)
-    // Fallback to mock user
-    const mockUser = getAdminUser()
-    login(mockUser, 'mock-admin-token-' + Date.now())
+    console.error('❌ Admin login error:', error)
+    console.error('⚠️ Cannot login - mock tokens won\'t work with API')
     return false
   }
 }
@@ -322,6 +348,49 @@ export const loginAsStudentDirect = async () => {
     // Fallback to mock user
     const mockUser = getStudentUser()
     login(mockUser, 'mock-student-token-' + Date.now())
+    return false
+  }
+}
+
+export const loginAsUserDirect = async () => {
+  const { login } = useAuthStore.getState()
+
+  try {
+    const loginResponse = await fetch('http://localhost:8080/api/v1/dev/login-user', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (loginResponse.ok) {
+      const data = await loginResponse.json()
+      console.log('✅ Development user login response:', data)
+
+      const user: User = {
+        id: data.user.id || data.user._id,
+        full_name: data.user.full_name,
+        email: data.user.email,
+        email_verified: data.user.email_verified,
+        profile_picture: data.user.profile_picture || 'https://ui-avatars.io/api/?name=Johnny+Tester&background=3b82f6&color=fff',
+        last_login: data.user.last_login || new Date().toISOString(),
+        created_at: data.user.created_at || new Date().toISOString(),
+        updated_at: data.user.updated_at || new Date().toISOString(),
+        role: 'student',
+        user_type: 'user',
+        is_admin: false,
+        permissions: ['read'],
+      }
+
+      login(user, data.access_token, data.refresh_token)
+      return true
+    }
+
+    const errorText = await loginResponse.text()
+    console.error('Development user login failed:', errorText)
+    return false
+  } catch (error) {
+    console.error('User login error:', error)
     return false
   }
 }

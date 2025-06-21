@@ -26,37 +26,37 @@ export const Demo = () => {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex justify-center mb-8">
-          <div className="flex bg-gray-100 rounded-xl p-1">
+        <div className="flex justify-center mb-8 overflow-x-auto px-4">
+          <div className="flex bg-gray-100 rounded-xl p-1 min-w-fit">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-medium transition-all duration-200 whitespace-nowrap text-sm sm:text-base ${
                   activeTab === tab.id
                     ? 'bg-white text-emerald-600 shadow-sm'
                     : 'text-gray-600 hover:text-emerald-600'
                 }`}
               >
-                <span>{tab.icon}</span>
-                <span>{tab.label}</span>
+                <span className="text-sm sm:text-base">{tab.icon}</span>
+                <span className="hidden xs:inline sm:inline">{tab.label}</span>
               </button>
             ))}
           </div>
         </div>
 
         {/* Demo Content */}
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden mx-4 sm:mx-0">
           {/* Browser Header */}
-          <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+          <div className="bg-gray-50 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
             <div className="flex items-center gap-2">
-              <div className="flex gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-                <div className="w-3 h-3 rounded-full bg-green-400"></div>
+              <div className="flex gap-1.5 sm:gap-2">
+                <div className="w-2.5 sm:w-3 h-2.5 sm:h-3 rounded-full bg-red-400"></div>
+                <div className="w-2.5 sm:w-3 h-2.5 sm:h-3 rounded-full bg-yellow-400"></div>
+                <div className="w-2.5 sm:w-3 h-2.5 sm:h-3 rounded-full bg-green-400"></div>
               </div>
-              <div className="flex-1 mx-4">
-                <div className="bg-white rounded-md px-3 py-1 text-sm text-gray-600 border">
+              <div className="flex-1 mx-2 sm:mx-4">
+                <div className="bg-white rounded-md px-2 sm:px-3 py-1 text-xs sm:text-sm text-gray-600 border truncate">
                   🔒 z0nata.vercel.app/demo
                 </div>
               </div>
@@ -64,51 +64,51 @@ export const Demo = () => {
           </div>
 
           {/* Content Area */}
-          <div className="p-8 min-h-[500px]">
+          <div className="p-4 sm:p-8 min-h-[400px] sm:min-h-[500px]">
             {activeTab === 'mocktest' && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold text-gray-900">HCIA-AI V3.0 Mock Test</h3>
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
+              <div className="space-y-4 sm:space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+                  <h3 className="text-lg sm:text-xl font-bold text-gray-900">HCIA-AI V3.0 Mock Test</h3>
+                  <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600 flex-wrap">
                     <span>⏱️ 90 menit</span>
                     <span>📝 60 soal</span>
                     <span>🎯 600 poin</span>
                   </div>
                 </div>
                 
-                <div className="border rounded-lg p-6 bg-gray-50">
-                  <div className="flex items-center justify-between mb-4">
+                <div className="border rounded-lg p-4 sm:p-6 bg-gray-50">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 mb-4">
                     <span className="text-sm font-medium text-gray-600">Soal 1 dari 60</span>
-                    <div className="w-48 bg-gray-200 rounded-full h-2">
+                    <div className="w-full sm:w-48 bg-gray-200 rounded-full h-2">
                       <div className="bg-emerald-500 h-2 rounded-full w-2"></div>
                     </div>
                   </div>
                   
-                  <h4 className="text-lg font-semibold mb-4 text-gray-900">
+                  <h4 className="text-base sm:text-lg font-semibold mb-4 text-gray-900 leading-relaxed">
                     Apa yang dimaksud dengan Machine Learning dalam konteks Artificial Intelligence?
                   </h4>
                   
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-3">
                     {[
                       'Sistem yang dapat belajar dari data tanpa pemrograman eksplisit',
                       'Program komputer yang dapat bermain game',
                       'Teknologi untuk mengontrol robot',
                       'Aplikasi untuk menganalisis big data'
                     ].map((option, index) => (
-                      <label key={index} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-white cursor-pointer transition-colors">
-                        <input type="radio" name="question1" className="text-emerald-600" />
-                        <span className="font-medium text-gray-700">{String.fromCharCode(65 + index)}.</span>
-                        <span className="text-gray-700">{option}</span>
+                      <label key={index} className="flex items-start gap-2 sm:gap-3 p-3 rounded-lg border hover:bg-white cursor-pointer transition-colors">
+                        <input type="radio" name="question1" className="text-emerald-600 mt-0.5 flex-shrink-0" />
+                        <span className="font-medium text-gray-700 flex-shrink-0">{String.fromCharCode(65 + index)}.</span>
+                        <span className="text-gray-700 text-sm sm:text-base leading-relaxed">{option}</span>
                       </label>
                     ))}
                   </div>
                 </div>
                 
-                <div className="flex justify-between">
-                  <button className="px-6 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">
+                <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-0">
+                  <button className="w-full sm:w-auto px-4 sm:px-6 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 text-sm sm:text-base">
                     ← Sebelumnya
                   </button>
-                  <button className="px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">
+                  <button className="w-full sm:w-auto px-4 sm:px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm sm:text-base">
                     Selanjutnya →
                   </button>
                 </div>

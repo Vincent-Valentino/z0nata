@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -90,17 +91,20 @@ func (uc *UserController) Login(c *gin.Context) {
 	response, err := uc.userService.Login(c.Request.Context(), &req)
 	if err != nil {
 		// Log failed login attempt
-		go uc.activityLogService.LogAuthActivity(
-			c.Request.Context(),
-			models.ActivityUserLoginFailed,
-			"", // No user ID for failed login
-			req.Email,
-			"unknown", // User type unknown for failed login
-			false,
-			ipAddress,
-			userAgent,
-			err.Error(),
-		)
+		go func() {
+			ctx := context.Background()
+			uc.activityLogService.LogAuthActivity(
+				ctx,
+				models.ActivityUserLoginFailed,
+				"", // No user ID for failed login
+				req.Email,
+				"unknown", // User type unknown for failed login
+				false,
+				ipAddress,
+				userAgent,
+				err.Error(),
+			)
+		}()
 
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -152,17 +156,20 @@ func (uc *UserController) Login(c *gin.Context) {
 	}
 
 	// Log successful login
-	go uc.activityLogService.LogAuthActivity(
-		c.Request.Context(),
-		activityType,
-		userID,
-		userName,
-		userType,
-		true,
-		ipAddress,
-		userAgent,
-		"",
-	)
+	go func() {
+		ctx := context.Background()
+		uc.activityLogService.LogAuthActivity(
+			ctx,
+			activityType,
+			userID,
+			userName,
+			userType,
+			true,
+			ipAddress,
+			userAgent,
+			"",
+		)
+	}()
 
 	c.JSON(http.StatusOK, response)
 }
@@ -683,6 +690,7 @@ func (uc *UserController) UpdateUserStatus(c *gin.Context) {
 
 	// Log user status update activity
 	go func() {
+		ctx := context.Background()
 		adminUserID, _ := middleware.GetUserID(c)
 		adminUserName, adminUserType := uc.getUserInfo(c)
 
@@ -691,8 +699,9 @@ func (uc *UserController) UpdateUserStatus(c *gin.Context) {
 			activityType = models.ActivityUserSuspended
 		}
 
-		uc.activityLogService.LogUserActivity(
-			c.Request.Context(),
+		fmt.Printf("🔄 Attempting to log user status update activity...\n")
+		err := uc.activityLogService.LogUserActivity(
+			ctx,
 			activityType,
 			user.ID.Hex(),
 			user.FullName,
@@ -706,6 +715,12 @@ func (uc *UserController) UpdateUserStatus(c *gin.Context) {
 				"user_type":       string(user.UserType),
 			},
 		)
+
+		if err != nil {
+			fmt.Printf("❌ ERROR: Failed to log user status update activity: %v\n", err)
+		} else {
+			fmt.Printf("✅ SUCCESS: User status update activity logged successfully\n")
+		}
 	}()
 
 	c.JSON(http.StatusOK, gin.H{
@@ -845,11 +860,13 @@ func (uc *UserController) ApproveAccessRequest(c *gin.Context) {
 
 	// Log access request approval activity
 	go func() {
+		ctx := context.Background()
 		adminUserID, _ := middleware.GetUserID(c)
 		adminUserName, adminUserType := uc.getUserInfo(c)
 
-		uc.activityLogService.LogUserActivity(
-			c.Request.Context(),
+		fmt.Printf("🔄 Attempting to log access request approval activity...\n")
+		err := uc.activityLogService.LogUserActivity(
+			ctx,
 			models.ActivityUserAccessGranted,
 			user.ID.Hex(),
 			user.FullName,
@@ -864,6 +881,12 @@ func (uc *UserController) ApproveAccessRequest(c *gin.Context) {
 				"approval_note":   req.Notes,
 			},
 		)
+
+		if err != nil {
+			fmt.Printf("❌ ERROR: Failed to log access approval activity: %v\n", err)
+		} else {
+			fmt.Printf("✅ SUCCESS: Access approval activity logged successfully\n")
+		}
 	}()
 
 	c.JSON(http.StatusOK, gin.H{
@@ -924,11 +947,13 @@ func (uc *UserController) RejectAccessRequest(c *gin.Context) {
 
 	// Log access request rejection activity
 	go func() {
+		ctx := context.Background()
 		adminUserID, _ := middleware.GetUserID(c)
 		adminUserName, adminUserType := uc.getUserInfo(c)
 
-		uc.activityLogService.LogUserActivity(
-			c.Request.Context(),
+		fmt.Printf("🔄 Attempting to log access request rejection activity...\n")
+		err := uc.activityLogService.LogUserActivity(
+			ctx,
 			models.ActivityUserAccessRevoked,
 			user.ID.Hex(),
 			user.FullName,
@@ -943,6 +968,12 @@ func (uc *UserController) RejectAccessRequest(c *gin.Context) {
 				"rejection_note":  req.Notes,
 			},
 		)
+
+		if err != nil {
+			fmt.Printf("❌ ERROR: Failed to log access rejection activity: %v\n", err)
+		} else {
+			fmt.Printf("✅ SUCCESS: Access rejection activity logged successfully\n")
+		}
 	}()
 
 	c.JSON(http.StatusOK, gin.H{

@@ -3,123 +3,15 @@ package routes
 import (
 	"backend/controllers"
 	"backend/middleware"
-	"backend/models"
-	"net/http"
-	"os"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func SetupAuthRoutes(router gin.IRouter, userController *controllers.UserController, authMiddleware *middleware.AuthMiddleware, admin gin.IRouter) {
 	// Health check
 	router.GET("/health", userController.HealthCheck)
 
-	// Development-only routes
-	if os.Getenv("SERVER_ENVIRONMENT") != "production" && os.Getenv("ENVIRONMENT") != "production" {
-		dev := router.Group("/dev")
-		{
-			// Development admin login that bypasses normal auth
-			dev.POST("/login-admin", func(c *gin.Context) {
-				// Create a mock admin user
-				adminUser := models.Admin{
-					User: models.User{
-						ID:             primitive.NewObjectID(),
-						FullName:       "William Zonata",
-						Email:          "william.zonata@admin.com",
-						EmailVerified:  true,
-						ProfilePicture: "https://ui-avatars.io/api/?name=William+Zonata&background=ef4444&color=fff",
-						UserType:       models.UserTypeAdmin,
-						Status:         models.UserStatusActive,
-						LastLogin:      time.Now(),
-						CreatedAt:      time.Now(),
-						UpdatedAt:      time.Now(),
-					},
-					IsAdmin:     true,
-					Permissions: []string{"read", "write", "delete", "admin"},
-				}
-
-				// Get JWT manager from auth middleware to use the same configuration
-				jwtManager := authMiddleware.GetJWTManager()
-
-				accessToken, err := jwtManager.GenerateAccessToken(
-					adminUser.ID,
-					adminUser.Email,
-					string(adminUser.UserType),
-					adminUser.IsAdmin,
-				)
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
-					return
-				}
-
-				refreshToken, err := jwtManager.GenerateRefreshToken(adminUser.ID, adminUser.Email, false)
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate refresh token"})
-					return
-				}
-
-				// Return the response in the same format as regular login
-				c.JSON(http.StatusOK, models.AuthResponse{
-					User:         adminUser,
-					AccessToken:  accessToken,
-					RefreshToken: refreshToken,
-					ExpiresIn:    int64(jwtManager.GetAccessTokenExpiry().Seconds()),
-				})
-			})
-
-			// Development student login
-			dev.POST("/login-student", func(c *gin.Context) {
-				// Create a mock student user
-				studentUser := models.UserMahasiswa{
-					User: models.User{
-						ID:             primitive.NewObjectID(),
-						FullName:       "Vincent Valentino",
-						Email:          "vincent.valentino@student.com",
-						EmailVerified:  true,
-						ProfilePicture: "https://ui-avatars.io/api/?name=Vincent+Valentino&background=22c55e&color=fff",
-						UserType:       models.UserTypeMahasiswa,
-						Status:         models.UserStatusActive,
-						LastLogin:      time.Now(),
-						CreatedAt:      time.Now(),
-						UpdatedAt:      time.Now(),
-					},
-					NIM:     "2021001234",
-					Faculty: "Fakultas Teknik",
-					Major:   "Teknik Informatika",
-				}
-
-				// Get JWT manager from auth middleware to use the same configuration
-				jwtManager := authMiddleware.GetJWTManager()
-
-				accessToken, err := jwtManager.GenerateAccessToken(
-					studentUser.ID,
-					studentUser.Email,
-					string(studentUser.UserType),
-					false, // not admin
-				)
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
-					return
-				}
-
-				refreshToken, err := jwtManager.GenerateRefreshToken(studentUser.ID, studentUser.Email, false)
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate refresh token"})
-					return
-				}
-
-				// Return the response in the same format as regular login
-				c.JSON(http.StatusOK, models.AuthResponse{
-					User:         studentUser,
-					AccessToken:  accessToken,
-					RefreshToken: refreshToken,
-					ExpiresIn:    int64(jwtManager.GetAccessTokenExpiry().Seconds()),
-				})
-			})
-		}
-	}
+	// Note: Development routes are now handled by SetupDevRoutes in dev.go
 
 	// Public auth routes
 	auth := router.Group("/auth")

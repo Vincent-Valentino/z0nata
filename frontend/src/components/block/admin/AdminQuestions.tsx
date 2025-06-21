@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react'
 import { questionService, convertQuestionToDisplay } from '@/services/questionService'
 import type { QuestionDisplay, CreateQuestionRequest } from '@/services/questionService'
+import { useAuthStore, loginAsAdminDirect } from '@/store/authStore'
+import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { RefreshCw, AlertCircle } from 'lucide-react'
 
 // Import microfrontend components
 import { 
@@ -63,12 +67,61 @@ export const AdminQuestions = () => {
   })
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null)
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null)
+  const [retryingAuth, setRetryingAuth] = useState(false)
 
   // Load questions and stats from API
   useEffect(() => {
     loadQuestions()
     loadStats()
   }, [currentPage, typeFilter, difficultyFilter, searchTerm])
+
+  // Retry with fresh authentication
+  const handleRetryWithFreshAuth = async () => {
+    setRetryingAuth(true)
+    try {
+      console.log('🔄 Retrying with fresh authentication...')
+      const success = await loginAsAdminDirect()
+      if (success) {
+        // Wait a moment for auth state to update, then retry loading
+        setTimeout(() => {
+          loadQuestions()
+          loadStats()
+        }, 1000)
+      } else {
+        setError('Failed to authenticate. Please check if the backend is running.')
+      }
+    } catch (err) {
+      console.error('Auth retry failed:', err)
+      setError('Failed to authenticate. Please check if the backend is running.')
+    } finally {
+      setRetryingAuth(false)
+    }
+  }
+
+  // Add auth validation before API calls
+  const validateAuth = (): boolean => {
+    const { isAuthenticated, token, user } = useAuthStore.getState()
+    
+    // Check if user is actually authenticated with a real token
+    if (!isAuthenticated || !token || !user) {
+      setError('Please log in to access admin features.')
+      return false
+    }
+    
+    // Check if token is mock (fallback) token
+    if (token.includes('mock-')) {
+      setError('Authentication failed. Please use "Force Fresh Admin Login" in Dev Tools to get a valid token.')
+      return false
+    }
+    
+    // Check if user has admin privileges
+    if (!user.is_admin && user.role !== 'admin') {
+      setError('Admin privileges required to access questions.')
+      return false
+    }
+    
+    return true
+  }
 
   // Validation logic
   const validateForm = (): boolean => {
@@ -137,6 +190,12 @@ export const AdminQuestions = () => {
   }
 
   const loadQuestions = async () => {
+    // Validate auth before making API call
+    if (!validateAuth()) {
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
       setError(null)
@@ -164,7 +223,7 @@ export const AdminQuestions = () => {
         setTotalPages(1)
         setError(null)
       } else if (err.message.includes('401') || err.message.includes('403')) {
-        setError('You do not have permission to view questions. Please check your authentication.')
+        setError('Authentication failed. Please use "Force Fresh Admin Login" in Dev Tools to get a valid API token.')
       } else if (err.message.includes('500')) {
         setError('Server error occurred. Please try again later.')
       } else if (err.message.includes('Network Error') || err.message.includes('fetch')) {
@@ -178,6 +237,11 @@ export const AdminQuestions = () => {
   }
 
   const loadStats = async () => {
+    // Validate auth before making API call
+    if (!validateAuth()) {
+      return
+    }
+
     try {
       const statsResponse = await questionService.getQuestionStats()
       setStats(statsResponse)
@@ -399,6 +463,35 @@ export const AdminQuestions = () => {
     <div className="space-y-6">
       {/* Header with Stats */}
       <QuestionStatsCards stats={stats} />
+
+      {/* Authentication Error Alert */}
+      {error && (error.includes('Authentication failed') || error.includes('mock token') || error.includes('Please log in')) && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">Authentication Issue</p>
+              <p className="text-sm">{error}</p>
+            </div>
+            <Button
+              onClick={handleRetryWithFreshAuth}
+              disabled={retryingAuth}
+              variant="outline"
+              size="sm"
+              className="ml-4"
+            >
+              {retryingAuth ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Retrying...
+                </>
+              ) : (
+                'Retry with Fresh Login'
+              )}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Filters and Controls */}
       <QuestionFilters

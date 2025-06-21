@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -82,9 +84,16 @@ func (qc *QuestionController) CreateQuestion(c *gin.Context) {
 
 	// Log question creation activity
 	go func() {
+		// Use background context instead of request context which might be cancelled
+		ctx := context.Background()
 		userName, userType := qc.getUserInfo(c)
-		qc.activityLogService.LogQuestionActivity(
-			c.Request.Context(),
+
+		fmt.Printf("🔄 Attempting to log question creation activity...\n")
+		fmt.Printf("📝 Question: %s (ID: %s)\n", question.Title, question.ID.Hex())
+		fmt.Printf("👤 User: %s (%s)\n", userName, userType)
+
+		err := qc.activityLogService.LogQuestionActivity(
+			ctx,
 			models.ActivityQuestionCreated,
 			question.ID.Hex(),
 			question.Title,
@@ -97,6 +106,12 @@ func (qc *QuestionController) CreateQuestion(c *gin.Context) {
 				"points":     question.Points,
 			},
 		)
+
+		if err != nil {
+			fmt.Printf("❌ ERROR: Failed to log question creation activity: %v\n", err)
+		} else {
+			fmt.Printf("✅ SUCCESS: Question creation activity logged successfully\n")
+		}
 	}()
 
 	c.JSON(http.StatusCreated, question)
@@ -172,6 +187,7 @@ func (qc *QuestionController) UpdateQuestion(c *gin.Context) {
 
 	// Log question update activity
 	go func() {
+		ctx := context.Background()
 		userID, _ := middleware.GetUserID(c)
 		userName, userType := qc.getUserInfo(c)
 		changes := make(map[string]interface{})
@@ -188,8 +204,9 @@ func (qc *QuestionController) UpdateQuestion(c *gin.Context) {
 			changes["is_active"] = *req.IsActive
 		}
 
-		qc.activityLogService.LogQuestionActivity(
-			c.Request.Context(),
+		fmt.Printf("🔄 Attempting to log question update activity...\n")
+		err := qc.activityLogService.LogQuestionActivity(
+			ctx,
 			models.ActivityQuestionUpdated,
 			question.ID.Hex(),
 			question.Title,
@@ -198,6 +215,12 @@ func (qc *QuestionController) UpdateQuestion(c *gin.Context) {
 			userType,
 			changes,
 		)
+
+		if err != nil {
+			fmt.Printf("❌ ERROR: Failed to log question update activity: %v\n", err)
+		} else {
+			fmt.Printf("✅ SUCCESS: Question update activity logged successfully\n")
+		}
 	}()
 
 	c.JSON(http.StatusOK, question)
@@ -245,10 +268,13 @@ func (qc *QuestionController) DeleteQuestion(c *gin.Context) {
 
 	// Log question deletion activity
 	go func() {
+		ctx := context.Background()
 		userID, _ := middleware.GetUserID(c)
 		userName, userType := qc.getUserInfo(c)
-		qc.activityLogService.LogQuestionActivity(
-			c.Request.Context(),
+
+		fmt.Printf("🔄 Attempting to log question deletion activity...\n")
+		err := qc.activityLogService.LogQuestionActivity(
+			ctx,
 			models.ActivityQuestionDeleted,
 			question.ID.Hex(),
 			question.Title,
@@ -261,6 +287,12 @@ func (qc *QuestionController) DeleteQuestion(c *gin.Context) {
 				"points":     question.Points,
 			},
 		)
+
+		if err != nil {
+			fmt.Printf("❌ ERROR: Failed to log question deletion activity: %v\n", err)
+		} else {
+			fmt.Printf("✅ SUCCESS: Question deletion activity logged successfully\n")
+		}
 	}()
 
 	c.JSON(http.StatusOK, gin.H{"message": "Question deleted successfully"})

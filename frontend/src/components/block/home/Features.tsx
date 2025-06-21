@@ -114,27 +114,27 @@ export const Features = () => {
         </div>
 
         {/* Learning Features */}
-        <div className="grid md:grid-cols-3 gap-8 mb-20">
+        <div className="grid sm:grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 mb-16 sm:mb-20 px-4 sm:px-0">
           {learningFeatures.map((feature, index) => {
             const colorClasses = getColorClasses(feature.color)
             return (
               <div 
                 key={index}
-                className={`${colorClasses.bg} ${colorClasses.border} ${feature.highlight ? 'border-4 shadow-lg' : 'border-2'} rounded-2xl p-8 hover:shadow-xl transition-all duration-300 group relative`}
+                className={`${colorClasses.bg} ${colorClasses.border} ${feature.highlight ? 'border-4 shadow-lg' : 'border-2'} rounded-2xl p-6 sm:p-8 hover:shadow-xl transition-all duration-300 group relative`}
               >
                 {feature.highlight && (
-                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                    <div className="bg-blue-600 text-white px-4 py-1 rounded-full text-sm font-medium">
+                  <div className="absolute -top-2 sm:-top-3 left-1/2 transform -translate-x-1/2">
+                    <div className="bg-blue-600 text-white px-3 sm:px-4 py-1 rounded-full text-xs sm:text-sm font-medium">
                       ⭐ Fitur Utama
                     </div>
                   </div>
                 )}
                 
-                <div className={`${colorClasses.icon} w-16 h-16 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300`}>
-                  <span className="text-2xl">{feature.icon}</span>
+                <div className={`${colorClasses.icon} w-12 sm:w-16 h-12 sm:h-16 rounded-2xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform duration-300`}>
+                  <span className="text-xl sm:text-2xl">{feature.icon}</span>
                 </div>
                 
-                <h3 className={`text-xl font-bold ${colorClasses.text} mb-3`}>
+                <h3 className={`text-lg sm:text-xl font-bold ${colorClasses.text} mb-3`}>
                   {feature.title}
                 </h3>
                 
@@ -171,28 +171,28 @@ export const Features = () => {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8 mb-16">
+        <div className="grid sm:grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 mb-12 sm:mb-16 px-4 sm:px-0">
           {accessTypes.map((access, index) => {
             const colorClasses = getColorClasses(access.color)
             return (
               <div 
                 key={index}
-                className={`${access.featured ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-300 border-2 shadow-lg' : 'bg-white border-gray-200 border'} rounded-2xl p-8 hover:shadow-xl transition-all duration-300 relative`}
+                className={`${access.featured ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-300 border-2 shadow-lg' : 'bg-white border-gray-200 border'} rounded-2xl p-6 sm:p-8 hover:shadow-xl transition-all duration-300 relative`}
               >
                 {access.featured && (
-                  <div className="absolute -top-3 right-4">
-                    <div className="bg-emerald-600 text-white px-3 py-1 rounded-full text-sm font-medium">
+                  <div className="absolute -top-2 sm:-top-3 right-3 sm:right-4">
+                    <div className="bg-emerald-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium">
                       🌟 Recommended
                     </div>
                   </div>
                 )}
 
-                <div className="flex items-center gap-4 mb-6">
-                  <div className={`${colorClasses.icon} w-14 h-14 rounded-xl flex items-center justify-center`}>
-                    <span className="text-2xl">{access.icon}</span>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+                  <div className={`${colorClasses.icon} w-12 sm:w-14 h-12 sm:h-14 rounded-xl flex items-center justify-center flex-shrink-0`}>
+                    <span className="text-xl sm:text-2xl">{access.icon}</span>
                   </div>
-                  <div>
-                    <h4 className="text-xl font-bold text-gray-900">{access.title}</h4>
+                  <div className="flex-1">
+                    <h4 className="text-lg sm:text-xl font-bold text-gray-900">{access.title}</h4>
                     <p className={`text-sm font-medium ${colorClasses.text}`}>{access.subtitle}</p>
                   </div>
                 </div>

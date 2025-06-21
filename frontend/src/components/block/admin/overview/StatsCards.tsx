@@ -54,19 +54,21 @@ export const StatsCards = ({ adminStats }: StatsCardsProps) => {
   const statsCards = getStatsCards()
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
       {statsCards.map((stat) => (
         <Card key={stat.title} className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-            {stat.icon}
+            <CardTitle className="text-xs sm:text-sm font-medium truncate pr-2">{stat.title}</CardTitle>
+            <div className="flex-shrink-0">
+              {stat.icon}
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stat.value}</div>
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">{stat.description}</p>
+          <CardContent className="space-y-2">
+            <div className="text-xl sm:text-2xl font-bold">{stat.value}</div>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground flex-1 truncate">{stat.description}</p>
               {stat.trend && (
-                <div className={`flex items-center text-xs ${
+                <div className={`flex items-center text-xs flex-shrink-0 ${
                   stat.trend.isPositive ? 'text-green-600' : 'text-red-600'
                 }`}>
                   <TrendingUp className="h-3 w-3 mr-1" />

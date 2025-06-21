@@ -157,7 +157,7 @@ export const MikroskilAuthForm = ({ onBack, onSubmit }: MikroskilAuthFormProps) 
 
   return (
     <motion.div 
-      className="min-h-screen flex"
+      className="min-h-screen flex overflow-hidden"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -165,7 +165,7 @@ export const MikroskilAuthForm = ({ onBack, onSubmit }: MikroskilAuthFormProps) 
     >
       {/* Left side - Info */}
       <motion.div 
-        className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-emerald-600 to-teal-700 p-12 flex-col justify-center items-center text-white relative overflow-hidden"
+        className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-emerald-600 to-teal-700 p-8 lg:p-12 flex-col justify-center items-center text-white relative overflow-hidden"
         initial={{ x: -100, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ delay: 0.2, duration: 0.6 }}
@@ -334,7 +334,7 @@ export const MikroskilAuthForm = ({ onBack, onSubmit }: MikroskilAuthFormProps) 
 
       {/* Right side - Form */}
       <motion.div 
-        className="flex-1 flex flex-col justify-center px-8 sm:px-12 lg:px-16 bg-white lg:py-16"
+        className="flex-1 flex flex-col justify-center px-4 sm:px-8 lg:px-12 xl:px-16 bg-white py-8 lg:py-16 min-h-screen lg:min-h-0"
         initial={{ x: 100, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ delay: 0.3, duration: 0.6 }}
@@ -350,7 +350,7 @@ export const MikroskilAuthForm = ({ onBack, onSubmit }: MikroskilAuthFormProps) 
           }}
         >
           <motion.div 
-            className="mb-8"
+            className="mb-6 sm:mb-8"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
@@ -358,14 +358,14 @@ export const MikroskilAuthForm = ({ onBack, onSubmit }: MikroskilAuthFormProps) 
             <Button 
               variant="ghost" 
               onClick={onBack}
-              className="mb-6 -ml-2 hover:bg-gray-100 transition-colors duration-200"
+              className="mb-4 sm:mb-6 -ml-2 hover:bg-gray-100 transition-colors duration-200 touch-manipulation"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Kembali
             </Button>
             
             <motion.h1 
-              className="text-3xl font-bold text-gray-900 mb-2"
+              className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.7 }}
@@ -373,7 +373,7 @@ export const MikroskilAuthForm = ({ onBack, onSubmit }: MikroskilAuthFormProps) 
               {authType === 'login' ? 'Masuk Mahasiswa' : 'Daftar Mahasiswa'}
             </motion.h1>
             <motion.p 
-              className="text-gray-600"
+              className="text-gray-600 text-sm sm:text-base leading-relaxed"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.8 }}
@@ -387,7 +387,7 @@ export const MikroskilAuthForm = ({ onBack, onSubmit }: MikroskilAuthFormProps) 
 
           {/* Auth Type Toggle */}
           <motion.div 
-            className="flex rounded-lg bg-gray-100 p-1 gap-1 mb-6"
+            className="flex rounded-lg bg-gray-100 p-1 gap-1 mb-4 sm:mb-6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.9 }}
@@ -396,7 +396,7 @@ export const MikroskilAuthForm = ({ onBack, onSubmit }: MikroskilAuthFormProps) 
               type="button"
               variant={authType === 'login' ? "default" : "ghost"}
               onClick={() => handleAuthTypeChange('login')}
-              className={`flex-1 h-10 text-sm font-medium transition-all ${
+              className={`flex-1 h-10 sm:h-11 text-sm font-medium transition-all touch-manipulation ${
                 authType === 'login' 
                   ? 'bg-white shadow-sm text-gray-900' 
                   : 'bg-neutral-100 text-gray-600 hover:bg-white hover:text-gray-800'
@@ -408,7 +408,7 @@ export const MikroskilAuthForm = ({ onBack, onSubmit }: MikroskilAuthFormProps) 
               type="button"
               variant={authType === 'register' ? "default" : "ghost"}
               onClick={() => handleAuthTypeChange('register')}
-              className={`flex-1 h-10 text-sm font-medium transition-all ${
+              className={`flex-1 h-10 sm:h-11 text-sm font-medium transition-all touch-manipulation ${
                 authType === 'register' 
                   ? 'bg-white shadow-sm text-gray-900' 
                   : 'bg-neutral-100 text-gray-600 hover:bg-white hover:text-gray-800'
@@ -420,7 +420,7 @@ export const MikroskilAuthForm = ({ onBack, onSubmit }: MikroskilAuthFormProps) 
 
           <motion.form 
             onSubmit={handleSubmit} 
-            className="space-y-4"
+            className="space-y-3 sm:space-y-4"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -30 }}
@@ -443,6 +443,7 @@ export const MikroskilAuthForm = ({ onBack, onSubmit }: MikroskilAuthFormProps) 
                 <Input
                   id="nim"
                   type="text"
+                  inputMode="numeric"
                   value={formData.nim}
                   onChange={(e) => {
                     const value = e.target.value.replace(/\D/g, '').slice(0, 9)
@@ -450,7 +451,7 @@ export const MikroskilAuthForm = ({ onBack, onSubmit }: MikroskilAuthFormProps) 
                   }}
                   placeholder="231111923"
                   required
-                  className={`h-12 transition-all duration-300 focus:shadow-lg ${
+                  className={`h-11 sm:h-12 transition-all duration-300 focus:shadow-lg text-base ${
                     formData.nim && !validateNIM(formData.nim) ? 'border-red-500' : ''
                   }`}
                 />
@@ -492,7 +493,7 @@ export const MikroskilAuthForm = ({ onBack, onSubmit }: MikroskilAuthFormProps) 
                     onChange={(e) => handleInputChange('name', e.target.value)}
                     placeholder="Nama sesuai data mahasiswa"
                     required
-                    className="h-12 transition-all duration-300 focus:shadow-lg"
+                    className="h-11 sm:h-12 transition-all duration-300 focus:shadow-lg text-base"
                   />
                 </motion.div>
               </motion.div>
@@ -514,11 +515,12 @@ export const MikroskilAuthForm = ({ onBack, onSubmit }: MikroskilAuthFormProps) 
                 <Input
                   id="email"
                   type="email"
+                  inputMode="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                   placeholder="nama@students.mikroskil.ac.id"
                   required
-                  className="h-12 transition-all duration-300 focus:shadow-lg"
+                  className="h-11 sm:h-12 transition-all duration-300 focus:shadow-lg text-base"
                 />
               </motion.div>
               <p className="text-xs text-gray-500">

@@ -39,17 +39,22 @@ export const QuickActions = ({ onQuickAction }: QuickActionsProps) => {
           Frequently used admin functions
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-3 md:grid-cols-3">
+      <CardContent className="grid gap-2 sm:gap-3 grid-cols-1 sm:grid-cols-3">
         {quickActions.map((action) => (
           <Button 
             key={action.id}
-            className="w-full justify-start gap-2" 
+            className="w-full justify-start gap-2 touch-manipulation h-auto py-3 sm:py-2" 
             variant="outline"
             onClick={() => onQuickAction(action.id)}
             title={action.description}
           >
-            {action.icon}
-            {action.label}
+            <div className="flex-shrink-0">
+              {action.icon}
+            </div>
+            <div className="flex flex-col items-start sm:block min-w-0">
+              <span className="font-medium text-sm">{action.label}</span>
+              <span className="text-xs text-muted-foreground sm:hidden truncate">{action.description}</span>
+            </div>
           </Button>
         ))}
       </CardContent>

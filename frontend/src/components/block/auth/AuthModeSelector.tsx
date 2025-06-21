@@ -154,11 +154,11 @@ const FloatingParticles = ({ color = "emerald" }: { color?: "emerald" | "blue" }
 
 export const AuthModeSelector = ({ onModeSelect, onBack }: AuthModeSelectorProps) => {
   return (
-    <div className="min-h-screen relative">
+    <div className="min-h-screen relative overflow-hidden">
       {/* Back Button */}
       {onBack && (
         <motion.div
-          className="absolute top-6 left-6 z-50"
+          className="absolute top-4 sm:top-6 left-4 sm:left-6 z-50"
           initial={{ x: -100, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
@@ -166,33 +166,36 @@ export const AuthModeSelector = ({ onModeSelect, onBack }: AuthModeSelectorProps
           <Button 
             variant="ghost" 
             onClick={onBack}
-            className="bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 border border-white/20"
+            className="bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 border border-white/20 text-sm sm:text-base px-3 sm:px-4 py-2 touch-manipulation"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Kembali
+            <span className="hidden sm:inline">Kembali</span>
+            <span className="sm:hidden">Back</span>
           </Button>
         </motion.div>
       )}
 
-      <div className="min-h-screen grid lg:grid-cols-2">
+      <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2">
         {/* Left Side - Mahasiswa Mikroskil */}
         <div 
-          className="relative bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 p-12 flex flex-col justify-center items-center text-white cursor-pointer group transition-all duration-500 hover:from-emerald-700 hover:via-emerald-800 hover:to-teal-900"
+          className="relative bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 p-6 sm:p-8 lg:p-12 flex flex-col justify-center items-center text-white cursor-pointer group transition-all duration-500 hover:from-emerald-700 hover:via-emerald-800 hover:to-teal-900 touch-manipulation min-h-[50vh] lg:min-h-screen"
           onClick={() => onModeSelect('mikroskil')}
         >
-          {/* Enhanced Moving Waves */}
-          <EnhancedWaveAnimation color="emerald" />
-          <FloatingParticles color="emerald" />
+          {/* Enhanced Moving Waves - Reduced on mobile for performance */}
+          <div className="hidden sm:block">
+            <EnhancedWaveAnimation color="emerald" />
+            <FloatingParticles color="emerald" />
+          </div>
           
-          <div className="relative z-10 text-center max-w-md">
+          <div className="relative z-10 text-center max-w-md w-full">
             {/* Mikroskil Logo */}
             <div 
-              className="w-28 h-28 backdrop-blur-sm rounded-3xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform duration-300 overflow-hidden shadow-2xl"
+              className="w-20 sm:w-24 lg:w-28 h-20 sm:h-24 lg:h-28 backdrop-blur-sm rounded-2xl sm:rounded-3xl flex items-center justify-center mx-auto mb-6 sm:mb-8 group-hover:scale-110 transition-transform duration-300 overflow-hidden shadow-2xl"
             >
               <img 
                 src="https://akupintar.id/documents/20143/0/1623140380992-header_kampus-sekolah_tinggi_manajemen_informatika_dan_komputer_mikroskil.jpg/61378704-09c6-18b0-efbc-deb06399fafc?version=1.0&t=1623140381118&imageThumbnail=1"
                 alt="Mikroskil Logo" 
-                className="w-24 h-24 object-contain rounded-xl"
+                className="w-16 sm:w-20 lg:w-24 h-16 sm:h-20 lg:h-24 object-contain rounded-xl"
                 onError={(e) => {
                   // Fallback if image fails to load
                   const img = e.currentTarget as HTMLImageElement;
@@ -207,17 +210,17 @@ export const AuthModeSelector = ({ onModeSelect, onBack }: AuthModeSelectorProps
             </div>
 
             {/* Content */}
-            <div className="mb-8">
-              <h2 className="text-4xl font-bold mb-4">
+            <div className="mb-6 sm:mb-8">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 px-2">
                 Mahasiswa Mikroskil
               </h2>
-              <p className="text-emerald-100 text-lg mb-6">
+              <p className="text-emerald-100 text-base sm:text-lg mb-4 sm:mb-6 px-4">
                 Akses penuh gratis untuk semua fitur platform
               </p>
             </div>
 
             {/* Steps */}
-            <div className="space-y-4 mb-8">
+            <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8 px-2">
               {[
                 'Masukkan NIM & Email Mikroskil',
                 'Verifikasi identitas mahasiswa', 
@@ -225,19 +228,19 @@ export const AuthModeSelector = ({ onModeSelect, onBack }: AuthModeSelectorProps
               ].map((step, index) => (
                 <div 
                   key={index}
-                  className="flex items-center gap-3 text-emerald-100 group-hover:translate-x-2 transition-transform duration-300"
+                  className="flex items-center gap-2 sm:gap-3 text-emerald-100 group-hover:translate-x-2 transition-transform duration-300 text-sm sm:text-base"
                 >
-                  <div className="w-7 h-7 bg-emerald-500 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-lg">
+                  <div className="w-6 sm:w-7 h-6 sm:h-7 bg-emerald-500 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold text-white shadow-lg flex-shrink-0">
                     {index + 1}
                   </div>
-                  <span className="font-medium">{step}</span>
+                  <span className="font-medium leading-relaxed">{step}</span>
                 </div>
               ))}
             </div>
 
             <Button 
               size="lg"
-              className="w-full bg-white text-emerald-700 hover:bg-emerald-50 font-semibold shadow-xl hover:shadow-2xl transition-all duration-300 py-3 text-lg"
+              className="w-full bg-white text-emerald-700 hover:bg-emerald-50 font-semibold shadow-xl hover:shadow-2xl transition-all duration-300 py-3 sm:py-4 text-base sm:text-lg touch-manipulation"
               onClick={() => onModeSelect('mikroskil')}
             >
               Login dengan NIM
@@ -247,35 +250,37 @@ export const AuthModeSelector = ({ onModeSelect, onBack }: AuthModeSelectorProps
 
         {/* Right Side - Regular Users */}
         <div 
-          className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 p-12 flex flex-col justify-center items-center text-white cursor-pointer group transition-all duration-500 hover:from-blue-700 hover:via-blue-800 hover:to-indigo-900"
+          className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 p-6 sm:p-8 lg:p-12 flex flex-col justify-center items-center text-white cursor-pointer group transition-all duration-500 hover:from-blue-700 hover:via-blue-800 hover:to-indigo-900 touch-manipulation min-h-[50vh] lg:min-h-screen"
           onClick={() => onModeSelect('regular')}
         >
-          {/* Enhanced Wave Animation for Regular Users */}
-          <EnhancedWaveAnimation color="blue" />
-          <FloatingParticles color="blue" />
+          {/* Enhanced Wave Animation for Regular Users - Reduced on mobile */}
+          <div className="hidden sm:block">
+            <EnhancedWaveAnimation color="blue" />
+            <FloatingParticles color="blue" />
+          </div>
           
-          <div className="relative z-10 text-center max-w-md">
+          <div className="relative z-10 text-center max-w-md w-full">
             {/* Icon */}
             <div 
-              className="w-24 h-24 bg-white/20 backdrop-blur-sm rounded-3xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform duration-300 shadow-2xl"
+              className="w-20 sm:w-24 h-20 sm:h-24 bg-white/20 backdrop-blur-sm rounded-2xl sm:rounded-3xl flex items-center justify-center mx-auto mb-6 sm:mb-8 group-hover:scale-110 transition-transform duration-300 shadow-2xl"
             >
-              <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-10 sm:w-12 h-10 sm:h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
               </svg>
             </div>
 
             {/* Content */}
-            <div className="mb-8">
-              <h2 className="text-4xl font-bold text-white mb-4">
+            <div className="mb-6 sm:mb-8">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-3 sm:mb-4 px-2">
                 Pengguna Reguler
               </h2>
-              <p className="text-blue-100 text-lg mb-6">
+              <p className="text-blue-100 text-base sm:text-lg mb-4 sm:mb-6 px-4">
                 Daftar akun dan ajukan akses ke admin platform
               </p>
             </div>
 
             {/* Features */}
-            <div className="space-y-4 mb-8">
+            <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8 px-2">
               {[
                 { text: 'Time Quiz unlimited', color: 'green' },
                 { text: 'Akses dokumentasi lengkap', color: 'green' },
@@ -283,10 +288,10 @@ export const AuthModeSelector = ({ onModeSelect, onBack }: AuthModeSelectorProps
               ].map((feature, index) => (
                 <div 
                   key={index}
-                  className="flex items-center gap-3 text-blue-100 group-hover:translate-x-2 transition-transform duration-300"
+                  className="flex items-center gap-2 sm:gap-3 text-blue-100 group-hover:translate-x-2 transition-transform duration-300 text-sm sm:text-base"
                 >
                   <div 
-                    className={`w-6 h-6 rounded-full flex items-center justify-center shadow-lg ${
+                    className={`w-5 sm:w-6 h-5 sm:h-6 rounded-full flex items-center justify-center shadow-lg flex-shrink-0 ${
                       feature.color === 'green' ? 'bg-green-100' : 'bg-yellow-100'
                     }`}
                   >
@@ -304,14 +309,14 @@ export const AuthModeSelector = ({ onModeSelect, onBack }: AuthModeSelectorProps
                       )}
                     </svg>
                   </div>
-                  <span className="font-medium">{feature.text}</span>
+                  <span className="font-medium leading-relaxed">{feature.text}</span>
                 </div>
               ))}
             </div>
 
             <Button 
               size="lg"
-              className="w-full bg-white text-blue-700 hover:bg-blue-50 font-semibold shadow-xl hover:shadow-2xl transition-all duration-300 py-3 text-lg"
+              className="w-full bg-white text-blue-700 hover:bg-blue-50 font-semibold shadow-xl hover:shadow-2xl transition-all duration-300 py-3 sm:py-4 text-base sm:text-lg touch-manipulation"
               onClick={() => onModeSelect('regular')}
             >
               Daftar Akun

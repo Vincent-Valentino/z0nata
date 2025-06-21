@@ -82,7 +82,7 @@ export const AdminOverview = ({ onSectionChange }: AdminOverviewProps) => {
   if (!adminStats) return null
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header with refresh button */}
       <OverviewHeader 
         onRefresh={() => loadAdminStats(true)}
@@ -95,7 +95,7 @@ export const AdminOverview = ({ onSectionChange }: AdminOverviewProps) => {
       {/* Quick Actions */}
       <QuickActions onQuickAction={handleQuickAction} />
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
         {/* Question Statistics */}
         <QuestionStats adminStats={adminStats} />
 
@@ -103,7 +103,9 @@ export const AdminOverview = ({ onSectionChange }: AdminOverviewProps) => {
         <DocumentationStats adminStats={adminStats} />
 
         {/* Recent Activity */}
-        <RecentActivity refreshTrigger={refreshTrigger} />
+        <div className="lg:col-span-2 xl:col-span-1">
+          <RecentActivity refreshTrigger={refreshTrigger} />
+        </div>
       </div>
     </div>
   )

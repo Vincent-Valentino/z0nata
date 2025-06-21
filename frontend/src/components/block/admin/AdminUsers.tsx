@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   Search, 
   Filter, 
@@ -17,9 +18,11 @@ import {
   Calendar,
   Shield,
   Eye,
-  Loader2
+  Loader2,
+  RefreshCw
 } from 'lucide-react'
 import { adminService, type User, type UserStats, type AccessRequest } from '@/services/adminService'
+import { useAuthStore, loginAsAdminDirect } from '@/store/authStore'
 
 export const AdminUsers = () => {
   const [searchTerm, setSearchTerm] = useState('')
@@ -32,17 +35,79 @@ export const AdminUsers = () => {
   const [requestsLoading, setRequestsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [retryingAuth, setRetryingAuth] = useState(false)
+
+  // Add auth validation before API calls
+  const validateAuth = (): boolean => {
+    const { isAuthenticated, token, user } = useAuthStore.getState()
+    
+    // Check if user is actually authenticated with a real token
+    if (!isAuthenticated || !token || !user) {
+      setError('Please log in to access admin features.')
+      return false
+    }
+    
+    // Check if token is mock (fallback) token
+    if (token.includes('mock-')) {
+      setError('Authentication failed. Please use "Force Fresh Admin Login" in Dev Tools to get a valid token.')
+      return false
+    }
+    
+    // Check if user has admin privileges
+    if (!user.is_admin && user.role !== 'admin') {
+      setError('Admin privileges required to access user management.')
+      return false
+    }
+    
+    return true
+  }
+
+  // Retry with fresh authentication
+  const handleRetryWithFreshAuth = async () => {
+    setRetryingAuth(true)
+    try {
+      console.log('🔄 Retrying with fresh authentication...')
+      const success = await loginAsAdminDirect()
+      if (success) {
+        // Wait a moment for auth state to update, then retry loading
+        setTimeout(async () => {
+          await Promise.all([loadStats(), loadUsers(), loadAccessRequests()])
+        }, 1000)
+      } else {
+        setError('Failed to authenticate. Please check if the backend is running.')
+      }
+    } catch (err) {
+      console.error('Auth retry failed:', err)
+      setError('Failed to authenticate. Please check if the backend is running.')
+    } finally {
+      setRetryingAuth(false)
+    }
+  }
 
   const loadStats = async () => {
+    // Validate auth before making API call
+    if (!validateAuth()) {
+      return
+    }
+
     try {
       const statsData = await adminService.getUserStats()
       setStats(statsData)
     } catch (err: any) {
       console.error('Error loading stats:', err)
+      if (err.message.includes('401') || err.message.includes('403')) {
+        setError('Authentication failed. Please use "Force Fresh Admin Login" in Dev Tools to get a valid API token.')
+      }
     }
   }
 
   const loadUsers = async () => {
+    // Validate auth before making API call
+    if (!validateAuth()) {
+      setUsersLoading(false)
+      return
+    }
+
     try {
       setUsersLoading(true)
       setError(null)
@@ -60,14 +125,25 @@ export const AdminUsers = () => {
       setUsers(response.users)
     } catch (err: any) {
       console.error('Error loading users:', err)
-      const errorMessage = err.message || 'Failed to load users'
-      setError(errorMessage)
+      if (err.message.includes('401') || err.message.includes('403')) {
+        setError('Authentication failed. Please use "Force Fresh Admin Login" in Dev Tools to get a valid API token.')
+      } else if (err.message.includes('404')) {
+        setError('User management endpoint not found. Please check if the backend is running.')
+      } else {
+        setError(err.message || 'Failed to load users')
+      }
     } finally {
       setUsersLoading(false)
     }
   }
 
   const loadAccessRequests = async () => {
+    // Validate auth before making API call
+    if (!validateAuth()) {
+      setRequestsLoading(false)
+      return
+    }
+
     try {
       setRequestsLoading(true)
       const response = await adminService.getAccessRequests({ 
@@ -78,6 +154,9 @@ export const AdminUsers = () => {
       setAccessRequests(response.requests)
     } catch (err: any) {
       console.error('Error loading access requests:', err)
+      if (err.message.includes('401') || err.message.includes('403')) {
+        setError('Authentication failed. Please use "Force Fresh Admin Login" in Dev Tools to get a valid API token.')
+      }
     } finally {
       setRequestsLoading(false)
     }
@@ -177,6 +256,35 @@ export const AdminUsers = () => {
 
   return (
     <div className="space-y-6">
+      {/* Authentication Error Alert */}
+      {error && (error.includes('Authentication failed') || error.includes('mock token') || error.includes('Please log in')) && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">Authentication Issue</p>
+              <p className="text-sm">{error}</p>
+            </div>
+            <Button
+              onClick={handleRetryWithFreshAuth}
+              disabled={retryingAuth}
+              variant="outline"
+              size="sm"
+              className="ml-4"
+            >
+              {retryingAuth ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Retrying...
+                </>
+              ) : (
+                'Retry with Fresh Login'
+              )}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Header Stats */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>

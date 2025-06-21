@@ -131,7 +131,7 @@ export interface SystemNotification {
 }
 
 // API base configuration
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'
 
 // Helper function to get auth headers
 const getAuthHeaders = () => {
@@ -169,12 +169,30 @@ export const adminService = {
       const query = searchParams.toString()
       const url = `${API_BASE}/admin/users${query ? `?${query}` : ''}`
       
+      console.log('🔗 Making request to admin users endpoint:', url)
+      
+      const headers = getAuthHeaders()
+      console.log('🔑 Using auth headers:', { 
+        authorization: headers.Authorization?.slice(0, 30) + '...',
+        contentType: headers['Content-Type'] 
+      })
+      
       const response = await fetch(url, {
         method: 'GET',
-        headers: getAuthHeaders(),
+        headers,
       })
 
-      return handleResponse(response)
+      console.log('📡 Admin users response:', response.status, response.statusText)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('❌ Admin users API error:', errorText)
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const data = await response.json()
+      console.log('✅ Admin users data received:', data)
+      return data
     } catch (error) {
       console.error('Error fetching users:', error)
       throw error

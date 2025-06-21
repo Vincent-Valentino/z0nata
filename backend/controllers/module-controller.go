@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -146,26 +147,29 @@ func (mc *ModuleController) CreateModule(c *gin.Context) {
 	}
 
 	// Log module creation activity
-	userName, userType := mc.getUserInfo(c)
-	fmt.Printf("DEBUG: Logging module creation activity for module %s by user %s (%s)\n", module.Name, userName, userType)
-	err = mc.activityLogService.LogModuleActivity(
-		c.Request.Context(),
-		models.ActivityModuleCreated,
-		module.ID.Hex(),
-		module.Name,
-		userID,
-		userName,
-		userType,
-		map[string]interface{}{
-			"description": module.Description,
-			"order":       module.Order,
-		},
-	)
-	if err != nil {
-		fmt.Printf("ERROR: Failed to log module creation activity: %v\n", err)
-	} else {
-		fmt.Printf("SUCCESS: Module creation activity logged successfully\n")
-	}
+	go func() {
+		ctx := context.Background()
+		userName, userType := mc.getUserInfo(c)
+		fmt.Printf("🔄 Attempting to log module creation activity for module %s by user %s (%s)\n", module.Name, userName, userType)
+		err := mc.activityLogService.LogModuleActivity(
+			ctx,
+			models.ActivityModuleCreated,
+			module.ID.Hex(),
+			module.Name,
+			userID,
+			userName,
+			userType,
+			map[string]interface{}{
+				"description": module.Description,
+				"order":       module.Order,
+			},
+		)
+		if err != nil {
+			fmt.Printf("❌ ERROR: Failed to log module creation activity: %v\n", err)
+		} else {
+			fmt.Printf("✅ SUCCESS: Module creation activity logged successfully\n")
+		}
+	}()
 
 	c.JSON(http.StatusCreated, module)
 }
@@ -214,34 +218,37 @@ func (mc *ModuleController) UpdateModule(c *gin.Context) {
 	}
 
 	// Log module update activity
-	userName, userType := mc.getUserInfo(c)
-	changes := make(map[string]interface{})
-	if req.Name != nil {
-		changes["name"] = *req.Name
-	}
-	if req.Description != nil {
-		changes["description"] = *req.Description
-	}
-	if req.Order != nil {
-		changes["order"] = *req.Order
-	}
+	go func() {
+		ctx := context.Background()
+		userName, userType := mc.getUserInfo(c)
+		changes := make(map[string]interface{})
+		if req.Name != nil {
+			changes["name"] = *req.Name
+		}
+		if req.Description != nil {
+			changes["description"] = *req.Description
+		}
+		if req.Order != nil {
+			changes["order"] = *req.Order
+		}
 
-	fmt.Printf("DEBUG: Logging module update activity for module %s by user %s (%s)\n", module.Name, userName, userType)
-	err = mc.activityLogService.LogModuleActivity(
-		c.Request.Context(),
-		models.ActivityModuleUpdated,
-		module.ID.Hex(),
-		module.Name,
-		userID,
-		userName,
-		userType,
-		changes,
-	)
-	if err != nil {
-		fmt.Printf("ERROR: Failed to log module update activity: %v\n", err)
-	} else {
-		fmt.Printf("SUCCESS: Module update activity logged successfully\n")
-	}
+		fmt.Printf("🔄 Attempting to log module update activity for module %s by user %s (%s)\n", module.Name, userName, userType)
+		err := mc.activityLogService.LogModuleActivity(
+			ctx,
+			models.ActivityModuleUpdated,
+			module.ID.Hex(),
+			module.Name,
+			userID,
+			userName,
+			userType,
+			changes,
+		)
+		if err != nil {
+			fmt.Printf("❌ ERROR: Failed to log module update activity: %v\n", err)
+		} else {
+			fmt.Printf("✅ SUCCESS: Module update activity logged successfully\n")
+		}
+	}()
 
 	c.JSON(http.StatusOK, module)
 }
@@ -280,20 +287,29 @@ func (mc *ModuleController) DeleteModule(c *gin.Context) {
 	}
 
 	// Log module deletion activity
-	userID, _ := middleware.GetUserID(c)
-	userName, userType := mc.getUserInfo(c)
-	mc.activityLogService.LogModuleActivity(
-		c.Request.Context(),
-		models.ActivityModuleDeleted,
-		module.ID.Hex(),
-		module.Name,
-		userID,
-		userName,
-		userType,
-		map[string]interface{}{
-			"submodules_count": len(module.SubModules),
-		},
-	)
+	go func() {
+		ctx := context.Background()
+		userID, _ := middleware.GetUserID(c)
+		userName, userType := mc.getUserInfo(c)
+		fmt.Printf("🔄 Attempting to log module deletion activity for module %s\n", module.Name)
+		err := mc.activityLogService.LogModuleActivity(
+			ctx,
+			models.ActivityModuleDeleted,
+			module.ID.Hex(),
+			module.Name,
+			userID,
+			userName,
+			userType,
+			map[string]interface{}{
+				"submodules_count": len(module.SubModules),
+			},
+		)
+		if err != nil {
+			fmt.Printf("❌ ERROR: Failed to log module deletion activity: %v\n", err)
+		} else {
+			fmt.Printf("✅ SUCCESS: Module deletion activity logged successfully\n")
+		}
+	}()
 
 	c.JSON(http.StatusOK, gin.H{"message": "Module deleted successfully"})
 }
@@ -344,24 +360,33 @@ func (mc *ModuleController) ToggleModulePublication(c *gin.Context) {
 	}
 
 	// Log module publication activity
-	userName, userType := mc.getUserInfo(c)
-	activityType := models.ActivityModulePublished
-	if !req.Published {
-		activityType = models.ActivityModuleUnpublished
-	}
+	go func() {
+		ctx := context.Background()
+		userName, userType := mc.getUserInfo(c)
+		activityType := models.ActivityModulePublished
+		if !req.Published {
+			activityType = models.ActivityModuleUnpublished
+		}
 
-	mc.activityLogService.LogModuleActivity(
-		c.Request.Context(),
-		activityType,
-		module.ID.Hex(),
-		module.Name,
-		userID,
-		userName,
-		userType,
-		map[string]interface{}{
-			"published": req.Published,
-		},
-	)
+		fmt.Printf("🔄 Attempting to log module publication activity for module %s\n", module.Name)
+		err := mc.activityLogService.LogModuleActivity(
+			ctx,
+			activityType,
+			module.ID.Hex(),
+			module.Name,
+			userID,
+			userName,
+			userType,
+			map[string]interface{}{
+				"published": req.Published,
+			},
+		)
+		if err != nil {
+			fmt.Printf("❌ ERROR: Failed to log module publication activity: %v\n", err)
+		} else {
+			fmt.Printf("✅ SUCCESS: Module publication activity logged successfully\n")
+		}
+	}()
 
 	c.JSON(http.StatusOK, module)
 }
@@ -411,21 +436,30 @@ func (mc *ModuleController) CreateSubModule(c *gin.Context) {
 	}
 
 	// Log submodule creation activity
-	userName, userType := mc.getUserInfo(c)
-	mc.activityLogService.LogModuleActivity(
-		c.Request.Context(),
-		models.ActivitySubModuleCreated,
-		subModule.ID.Hex(),
-		subModule.Name,
-		userID,
-		userName,
-		userType,
-		map[string]interface{}{
-			"parent_module_id": moduleIDStr,
-			"description":      subModule.Description,
-			"order":            subModule.Order,
-		},
-	)
+	go func() {
+		ctx := context.Background()
+		userName, userType := mc.getUserInfo(c)
+		fmt.Printf("🔄 Attempting to log submodule creation activity for %s\n", subModule.Name)
+		err := mc.activityLogService.LogModuleActivity(
+			ctx,
+			models.ActivitySubModuleCreated,
+			subModule.ID.Hex(),
+			subModule.Name,
+			userID,
+			userName,
+			userType,
+			map[string]interface{}{
+				"parent_module_id": moduleIDStr,
+				"description":      subModule.Description,
+				"order":            subModule.Order,
+			},
+		)
+		if err != nil {
+			fmt.Printf("❌ ERROR: Failed to log submodule creation activity: %v\n", err)
+		} else {
+			fmt.Printf("✅ SUCCESS: Submodule creation activity logged successfully\n")
+		}
+	}()
 
 	c.JSON(http.StatusCreated, subModule)
 }
@@ -482,22 +516,31 @@ func (mc *ModuleController) UpdateSubModule(c *gin.Context) {
 	}
 
 	// Log submodule update activity
-	userName, userType := mc.getUserInfo(c)
-	mc.activityLogService.LogModuleActivity(
-		c.Request.Context(),
-		models.ActivitySubModuleUpdated,
-		subModule.ID.Hex(),
-		subModule.Name,
-		userID,
-		userName,
-		userType,
-		map[string]interface{}{
-			"parent_module_id": moduleIDStr,
-			"name":             req.Name,
-			"description":      req.Description,
-			"order":            req.Order,
-		},
-	)
+	go func() {
+		ctx := context.Background()
+		userName, userType := mc.getUserInfo(c)
+		fmt.Printf("🔄 Attempting to log submodule update activity for %s\n", subModule.Name)
+		err := mc.activityLogService.LogModuleActivity(
+			ctx,
+			models.ActivitySubModuleUpdated,
+			subModule.ID.Hex(),
+			subModule.Name,
+			userID,
+			userName,
+			userType,
+			map[string]interface{}{
+				"parent_module_id": moduleIDStr,
+				"name":             req.Name,
+				"description":      req.Description,
+				"order":            req.Order,
+			},
+		)
+		if err != nil {
+			fmt.Printf("❌ ERROR: Failed to log submodule update activity: %v\n", err)
+		} else {
+			fmt.Printf("✅ SUCCESS: Submodule update activity logged successfully\n")
+		}
+	}()
 
 	c.JSON(http.StatusOK, subModule)
 }
@@ -552,21 +595,30 @@ func (mc *ModuleController) DeleteSubModule(c *gin.Context) {
 	}
 
 	// Log submodule deletion activity
-	userID, _ := middleware.GetUserID(c)
-	userName, userType := mc.getUserInfo(c)
-	mc.activityLogService.LogModuleActivity(
-		c.Request.Context(),
-		models.ActivitySubModuleDeleted,
-		subModuleIDStr,
-		subModuleName,
-		userID,
-		userName,
-		userType,
-		map[string]interface{}{
-			"parent_module_id":   moduleIDStr,
-			"parent_module_name": module.Name,
-		},
-	)
+	go func() {
+		ctx := context.Background()
+		userID, _ := middleware.GetUserID(c)
+		userName, userType := mc.getUserInfo(c)
+		fmt.Printf("🔄 Attempting to log submodule deletion activity for %s\n", subModuleName)
+		err := mc.activityLogService.LogModuleActivity(
+			ctx,
+			models.ActivitySubModuleDeleted,
+			subModuleIDStr,
+			subModuleName,
+			userID,
+			userName,
+			userType,
+			map[string]interface{}{
+				"parent_module_id":   moduleIDStr,
+				"parent_module_name": module.Name,
+			},
+		)
+		if err != nil {
+			fmt.Printf("❌ ERROR: Failed to log submodule deletion activity: %v\n", err)
+		} else {
+			fmt.Printf("✅ SUCCESS: Submodule deletion activity logged successfully\n")
+		}
+	}()
 
 	c.JSON(http.StatusOK, gin.H{"message": "Submodule deleted successfully"})
 }
@@ -625,25 +677,34 @@ func (mc *ModuleController) ToggleSubModulePublication(c *gin.Context) {
 	}
 
 	// Log submodule publication activity
-	userName, userType := mc.getUserInfo(c)
-	activityType := models.ActivitySubModulePublished
-	if !req.Published {
-		activityType = models.ActivitySubModuleUnpublished
-	}
+	go func() {
+		ctx := context.Background()
+		userName, userType := mc.getUserInfo(c)
+		activityType := models.ActivitySubModulePublished
+		if !req.Published {
+			activityType = models.ActivitySubModuleUnpublished
+		}
 
-	mc.activityLogService.LogModuleActivity(
-		c.Request.Context(),
-		activityType,
-		subModule.ID.Hex(),
-		subModule.Name,
-		userID,
-		userName,
-		userType,
-		map[string]interface{}{
-			"parent_module_id": moduleIDStr,
-			"published":        req.Published,
-		},
-	)
+		fmt.Printf("🔄 Attempting to log submodule publication activity for %s\n", subModule.Name)
+		err := mc.activityLogService.LogModuleActivity(
+			ctx,
+			activityType,
+			subModule.ID.Hex(),
+			subModule.Name,
+			userID,
+			userName,
+			userType,
+			map[string]interface{}{
+				"parent_module_id": moduleIDStr,
+				"published":        req.Published,
+			},
+		)
+		if err != nil {
+			fmt.Printf("❌ ERROR: Failed to log submodule publication activity: %v\n", err)
+		} else {
+			fmt.Printf("✅ SUCCESS: Submodule publication activity logged successfully\n")
+		}
+	}()
 
 	c.JSON(http.StatusOK, subModule)
 }

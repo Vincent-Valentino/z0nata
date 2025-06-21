@@ -72,7 +72,7 @@ export interface CleanupResponse {
 }
 
 class ActivityLogService {
-  private baseUrl = '/api/v1/admin/activity-logs';
+  private baseUrl = '/admin/activity-logs';
 
   async getActivityLogs(params: GetActivityLogsRequest = {}): Promise<GetActivityLogsResponse> {
     try {
@@ -89,36 +89,63 @@ class ActivityLogService {
 
       const url = queryParams.toString() ? `${this.baseUrl}?${queryParams.toString()}` : this.baseUrl;
       
-      console.log('Fetching activity logs from:', url);
+      console.log('🔗 Fetching activity logs from:', url);
       const response = await api.get<GetActivityLogsResponse>(url);
-      console.log('Activity logs response:', response);
+      console.log('✅ Activity logs response:', response);
       return response;
     } catch (error) {
-      console.error('Error fetching activity logs:', error);
+      console.error('❌ Error fetching activity logs:', error);
       throw error;
     }
   }
 
   async getActivityStats(): Promise<ActivityStats> {
     try {
-      console.log('Fetching activity stats...');
+      console.log('🔗 Fetching activity stats...');
       const response = await api.get<ActivityStats>(`${this.baseUrl}/stats`);
-      console.log('Activity stats response:', response);
+      console.log('✅ Activity stats response:', response);
       return response;
     } catch (error) {
-      console.error('Error fetching activity stats:', error);
+      console.error('❌ Error fetching activity stats:', error);
       throw error;
     }
   }
 
   async getRecentActivities(limit: number = 10): Promise<{ activities: ActivityLog[]; count: number }> {
     try {
-      console.log(`Fetching recent activities (limit: ${limit})...`);
+      console.log(`🔗 Fetching recent activities (limit: ${limit})...`);
+      console.log(`📡 Full URL will be: ${import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1'}${this.baseUrl}/recent?limit=${limit}`);
+      
       const response = await api.get<{ activities: ActivityLog[]; count: number }>(`${this.baseUrl}/recent?limit=${limit}`);
-      console.log('Recent activities response:', response);
-      return response;
-    } catch (error) {
-      console.error('Error fetching recent activities:', error);
+      console.log('✅ Recent activities response:', response);
+      
+      // Ensure we return the correct format
+      if (response && typeof response === 'object') {
+        // If the response has activities array directly
+        if ('activities' in response && Array.isArray(response.activities)) {
+          return {
+            activities: response.activities,
+            count: response.count || response.activities.length
+          };
+        }
+        // If the response is just an array (shouldn't happen but defensive)
+        if (Array.isArray(response)) {
+          return {
+            activities: response,
+            count: response.length
+          };
+        }
+      }
+      
+      // Fallback to empty data
+      return { activities: [], count: 0 };
+    } catch (error: any) {
+      console.error('❌ Error fetching recent activities:', error);
+      console.error('❌ Error details:', {
+        message: error?.message || 'Unknown error',
+        stack: error?.stack || 'No stack trace',
+        url: `${this.baseUrl}/recent?limit=${limit}`
+      });
       throw error;
     }
   }

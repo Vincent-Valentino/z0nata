@@ -1,13 +1,12 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { HomePage } from '@/pages/HomePage'
-import { DocumentationPage } from '@/pages/documentation/DocumentationPage'
-import { MockTestPage } from '@/pages/tests/MockTestPage'
-import { TimeQuizPage } from '@/pages/tests/TimeQuizPage'
-import { AuthPage } from '@/pages/auth/AuthPage'
-import { AdminPage } from '@/pages/admin/AdminPage'
-import { ProfilePage } from '@/pages/profile/ProfilePage'
-import { ResultsPage } from '@/pages/results/ResultsPage'
-import OAuthCallback from '@/pages/oauth-callback'
+import { DocumentationPage } from '@/pages/DocumentationPage'
+import { MockTestPage } from '@/pages/MockTestPage'
+import { TimeQuizPage } from '@/pages/TimeQuizPage'
+import { AuthPage } from '@/pages/AuthPage'
+import { AdminPage } from '@/pages/AdminPage'
+import { ProfilePage } from '@/pages/ProfilePage'
+import { ResultsPage } from '@/pages/ResultsPage'
 
 export const AppRouter = () => {
   return (
@@ -25,7 +24,6 @@ export const AppRouter = () => {
         
         {/* Auth Routes */}
         <Route path="/login" element={<AuthPage />} />
-        <Route path="/oauth-callback" element={<OAuthCallback />} />
         
         {/* User Routes */}
         <Route path="/profile" element={<ProfilePage />} />

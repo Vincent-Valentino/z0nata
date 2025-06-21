@@ -63,6 +63,9 @@ func main() {
 	questionController := controllers.NewQuestionController(questionService, activityLogService)
 	activityLogController := controllers.NewActivityLogController(activityLogService)
 
+	// Development-only controller for quick login helpers
+	devController := controllers.NewDevController(userService)
+
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(jwtManager)
 
@@ -106,6 +109,11 @@ func main() {
 	routes.SetupUserActivityRoutes(api, userActivityController, authMiddleware)
 	routes.SetupQuestionRoutes(api, questionController, authMiddleware, admin)
 	routes.SetupActivityLogRoutes(api, activityLogController, authMiddleware, admin)
+
+	// Register development-only routes when not in production
+	if cfg.Server.Environment != "production" {
+		routes.SetupDevRoutes(api, devController)
+	}
 
 	// API documentation endpoint
 	api.GET("/docs", func(c *gin.Context) {
