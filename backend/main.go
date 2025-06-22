@@ -44,6 +44,7 @@ func main() {
 	userActivityRepo := repository.NewUserActivityRepository(db)
 	questionRepo := repository.NewQuestionRepository(db)
 	activityLogRepo := repository.NewActivityLogRepository(db)
+	quizSessionRepo := repository.NewQuizSessionRepository(db)
 
 	// Initialize utilities
 	jwtManager := utils.NewJWTManager(cfg.JWT)
@@ -55,6 +56,7 @@ func main() {
 	userActivityService := services.NewUserActivityService(userActivityRepo)
 	questionService := services.NewQuestionService(questionRepo)
 	activityLogService := services.NewActivityLogService(activityLogRepo)
+	quizSessionService := services.NewQuizSessionService(quizSessionRepo, questionRepo, userActivityRepo)
 
 	// Initialize controllers
 	userController := controllers.NewUserController(userService, userRepo, activityLogService)
@@ -62,6 +64,7 @@ func main() {
 	userActivityController := controllers.NewUserActivityController(userActivityService)
 	questionController := controllers.NewQuestionController(questionService, activityLogService)
 	activityLogController := controllers.NewActivityLogController(activityLogService)
+	quizSessionController := controllers.NewQuizSessionController(quizSessionService)
 
 	// Development-only controller for quick login helpers
 	devController := controllers.NewDevController(userService)
@@ -109,6 +112,7 @@ func main() {
 	routes.SetupUserActivityRoutes(api, userActivityController, authMiddleware)
 	routes.SetupQuestionRoutes(api, questionController, authMiddleware, admin)
 	routes.SetupActivityLogRoutes(api, activityLogController, authMiddleware, admin)
+	routes.SetupQuizSessionRoutes(router, quizSessionController, authMiddleware)
 
 	// Register development-only routes when not in production
 	if cfg.Server.Environment != "production" {

@@ -1016,13 +1016,11 @@ func (uc *UserController) handleOAuthCallback(c *gin.Context, provider string) {
 	state := c.Query("state")
 	errorParam := c.Query("error")
 
-	// Parse state to get user type
-	userType := "mahasiswa" // default
-	if state != "" {
-		if state == "admin" {
-			userType = "admin"
-		}
-	}
+	fmt.Printf("🔄 OAuth callback for %s: code=%s, state=%s, error=%s\n", provider, code, state, errorParam)
+
+	// Force all OAuth logins to use "user" role only
+	userType := "user"
+	fmt.Printf("🔒 OAuth login forced to use 'user' role (state was: %s)\n", state)
 
 	// Get frontend URL from environment or use default (always 5173 now)
 	frontendURL := os.Getenv("FRONTEND_URL")
@@ -1049,11 +1047,14 @@ func (uc *UserController) handleOAuthCallback(c *gin.Context, provider string) {
 		UserType: models.UserType(userType),
 	}
 
+	fmt.Printf("🔄 Processing OAuth login for %s with user type %s\n", provider, userType)
 	response, err := uc.userService.OAuthLogin(c.Request.Context(), &request)
 	if err != nil {
+		fmt.Printf("❌ OAuth login failed: %v\n", err)
 		c.Redirect(302, fmt.Sprintf("%s/oauth-callback?error=%s", frontendURL, url.QueryEscape(err.Error())))
 		return
 	}
+	fmt.Printf("✅ OAuth login successful\n")
 
 	// Determine user type from response
 	var userTypeStr string

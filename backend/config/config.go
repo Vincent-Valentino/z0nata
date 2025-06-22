@@ -79,7 +79,7 @@ func LoadConfig() models.Config {
 				ClientID:     getEnv("FACEBOOK_CLIENT_ID", ""),
 				ClientSecret: getEnv("FACEBOOK_CLIENT_SECRET", ""),
 				RedirectURL:  getEnv("FACEBOOK_REDIRECT_URL", ""),
-				Scopes:       getEnvArray("FACEBOOK_SCOPES", []string{"email", "public_profile"}),
+				Scopes:       getEnvArray("FACEBOOK_SCOPES", []string{"public_profile"}),
 			},
 			X: models.OAuthProvider{
 				ClientID:     getEnvWithFallback("X_CLIENT_ID", "TWITTER_CLIENT_ID", ""),
@@ -91,7 +91,7 @@ func LoadConfig() models.Config {
 				ClientID:     getEnv("GITHUB_CLIENT_ID", ""),
 				ClientSecret: getEnv("GITHUB_CLIENT_SECRET", ""),
 				RedirectURL:  getEnv("GITHUB_REDIRECT_URL", ""),
-				Scopes:       getEnvArray("GITHUB_SCOPES", []string{"user:email"}),
+				Scopes:       getEnvArray("GITHUB_SCOPES", []string{"user", "user:email"}),
 			},
 		},
 		Email: models.EmailConfig{

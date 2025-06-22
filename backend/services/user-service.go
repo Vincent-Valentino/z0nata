@@ -90,7 +90,7 @@ func (s *userService) initOAuthConfigs() {
 		}
 	}
 
-	// X (Twitter) OAuth
+	// X (Twitter) OAuth with PKCE
 	if s.config.OAuth.X.ClientID != "" {
 		s.oauthConfigs["x"] = &oauth2.Config{
 			ClientID:     s.config.OAuth.X.ClientID,
@@ -610,11 +610,29 @@ func (s *userService) OAuthLogin(ctx context.Context, req *models.OAuthRequest) 
 	email, _ := userInfo["email"].(string)
 	name, _ := userInfo["name"].(string)
 	picture, _ := userInfo["picture"].(string)
-	oauthID, _ := userInfo["id"].(string)
+
+	// Handle OAuth ID - it might be a string or number depending on provider
+	var oauthID string
+	fmt.Printf("🔍 Processing OAuth ID: %v (type: %T)\n", userInfo["id"], userInfo["id"])
+
+	if id, ok := userInfo["id"].(string); ok {
+		oauthID = id
+		fmt.Printf("✅ OAuth ID as string: %s\n", oauthID)
+	} else if id, ok := userInfo["id"].(float64); ok {
+		oauthID = fmt.Sprintf("%.0f", id)
+		fmt.Printf("✅ OAuth ID as float64: %s\n", oauthID)
+	} else if id, ok := userInfo["id"].(int64); ok {
+		oauthID = fmt.Sprintf("%d", id)
+		fmt.Printf("✅ OAuth ID as int64: %s\n", oauthID)
+	} else if id, ok := userInfo["id"].(int); ok {
+		oauthID = fmt.Sprintf("%d", id)
+		fmt.Printf("✅ OAuth ID as int: %s\n", oauthID)
+	}
 
 	// Validate required fields
 	if oauthID == "" {
-		return nil, errors.New("OAuth ID is required from provider")
+		fmt.Printf("❌ Failed to extract OAuth ID from: %v (type: %T)\n", userInfo["id"], userInfo["id"])
+		return nil, fmt.Errorf("OAuth ID is required from provider (got: %v, type: %T)", userInfo["id"], userInfo["id"])
 	}
 
 	// Handle missing email (some providers like X/Twitter might not provide email)
@@ -737,109 +755,197 @@ func (s *userService) getGoogleUserInfo(ctx context.Context, config *oauth2.Conf
 }
 
 func (s *userService) getFacebookUserInfo(ctx context.Context, config *oauth2.Config, code string) (map[string]interface{}, error) {
+	fmt.Printf("🔄 Exchanging Facebook OAuth code for token...\n")
 	token, err := config.Exchange(ctx, code)
 	if err != nil {
-		return nil, err
+		fmt.Printf("❌ Failed to exchange Facebook OAuth code: %v\n", err)
+		return nil, fmt.Errorf("failed to exchange code for token: %w", err)
 	}
+	fmt.Printf("✅ Successfully obtained Facebook OAuth token\n")
 
 	client := config.Client(ctx, token)
-	resp, err := client.Get("https://graph.facebook.com/me?fields=id,name,email,picture")
+	// Note: Using public_profile scope only (email removed due to Facebook restrictions)
+	fmt.Printf("🔄 Fetching Facebook user info...\n")
+	resp, err := client.Get("https://graph.facebook.com/me?fields=id,name,picture.type(large)")
 	if err != nil {
-		return nil, err
+		fmt.Printf("❌ Failed to fetch Facebook user info: %v\n", err)
+		return nil, fmt.Errorf("failed to get user info: %w", err)
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+	if resp.StatusCode != 200 {
+		fmt.Printf("❌ Facebook API returned status %d\n", resp.StatusCode)
+		return nil, fmt.Errorf("Facebook API returned status %d", resp.StatusCode)
 	}
-
-	var userInfo map[string]interface{}
-	if err := json.Unmarshal(body, &userInfo); err != nil {
-		return nil, err
-	}
-
-	return userInfo, nil
-}
-
-func (s *userService) getGithubUserInfo(ctx context.Context, config *oauth2.Config, code string) (map[string]interface{}, error) {
-	token, err := config.Exchange(ctx, code)
-	if err != nil {
-		return nil, err
-	}
-
-	client := config.Client(ctx, token)
-	resp, err := client.Get("https://api.github.com/user")
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		fmt.Printf("❌ Failed to read Facebook user response: %v\n", err)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
+
+	fmt.Printf("📄 Facebook user response: %s\n", string(body))
 
 	var userInfo map[string]interface{}
 	if err := json.Unmarshal(body, &userInfo); err != nil {
-		return nil, err
+		fmt.Printf("❌ Failed to parse Facebook user response: %v\n", err)
+		return nil, fmt.Errorf("failed to parse user info: %w", err)
 	}
 
-	// Get user's primary email
-	emailResp, err := client.Get("https://api.github.com/user/emails")
-	if err == nil {
-		defer emailResp.Body.Close()
-		emailBody, _ := io.ReadAll(emailResp.Body)
-		var emails []map[string]interface{}
-		if json.Unmarshal(emailBody, &emails) == nil {
-			for _, email := range emails {
-				if primary, ok := email["primary"].(bool); ok && primary {
-					userInfo["email"] = email["email"]
-					break
-				}
+	// Facebook doesn't provide email with public_profile scope
+	// Generate a placeholder email based on Facebook ID
+	if facebookID, ok := userInfo["id"].(string); ok {
+		userInfo["email"] = fmt.Sprintf("facebook_%s@facebook.local", facebookID)
+		fmt.Printf("ℹ️ Generated placeholder email for Facebook user: %s\n", userInfo["email"])
+	}
+
+	// Extract picture URL from nested structure
+	if picture, ok := userInfo["picture"].(map[string]interface{}); ok {
+		if data, ok := picture["data"].(map[string]interface{}); ok {
+			if url, ok := data["url"].(string); ok {
+				userInfo["picture"] = url
+				fmt.Printf("✅ Extracted Facebook profile picture URL\n")
 			}
 		}
 	}
 
+	fmt.Printf("✅ Successfully retrieved Facebook user info for ID: %v\n", userInfo["id"])
+	return userInfo, nil
+}
+
+func (s *userService) getGithubUserInfo(ctx context.Context, config *oauth2.Config, code string) (map[string]interface{}, error) {
+	fmt.Printf("🔄 Exchanging GitHub OAuth code for token...\n")
+	token, err := config.Exchange(ctx, code)
+	if err != nil {
+		fmt.Printf("❌ Failed to exchange GitHub OAuth code: %v\n", err)
+		return nil, fmt.Errorf("failed to exchange code for token: %w", err)
+	}
+	fmt.Printf("✅ Successfully obtained GitHub OAuth token\n")
+
+	client := config.Client(ctx, token)
+	fmt.Printf("🔄 Fetching GitHub user info...\n")
+	resp, err := client.Get("https://api.github.com/user")
+	if err != nil {
+		fmt.Printf("❌ Failed to fetch GitHub user info: %v\n", err)
+		return nil, fmt.Errorf("failed to get user info: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		fmt.Printf("❌ GitHub API returned status %d\n", resp.StatusCode)
+		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("❌ Failed to read GitHub user response: %v\n", err)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	fmt.Printf("📄 GitHub user response: %s\n", string(body))
+
+	var userInfo map[string]interface{}
+	if err := json.Unmarshal(body, &userInfo); err != nil {
+		fmt.Printf("❌ Failed to parse GitHub user response: %v\n", err)
+		return nil, fmt.Errorf("failed to parse user info: %w", err)
+	}
+
+	// Get user's primary email
+	fmt.Printf("🔄 Fetching GitHub user emails...\n")
+	emailResp, err := client.Get("https://api.github.com/user/emails")
+	if err == nil {
+		defer emailResp.Body.Close()
+		if emailResp.StatusCode == 200 {
+			emailBody, _ := io.ReadAll(emailResp.Body)
+			fmt.Printf("📧 GitHub emails response: %s\n", string(emailBody))
+			var emails []map[string]interface{}
+			if json.Unmarshal(emailBody, &emails) == nil {
+				for _, email := range emails {
+					if primary, ok := email["primary"].(bool); ok && primary {
+						userInfo["email"] = email["email"]
+						fmt.Printf("✅ Found primary email: %s\n", email["email"])
+						break
+					}
+				}
+			}
+		} else {
+			fmt.Printf("⚠️ GitHub emails API returned status %d\n", emailResp.StatusCode)
+		}
+	} else {
+		fmt.Printf("⚠️ Failed to fetch GitHub emails: %v\n", err)
+	}
+
+	// Ensure we have an ID field
+	if userInfo["id"] == nil {
+		fmt.Printf("❌ GitHub user info missing ID field\n")
+		return nil, fmt.Errorf("GitHub user info missing required ID field")
+	}
+
+	fmt.Printf("✅ Successfully retrieved GitHub user info for ID: %v\n", userInfo["id"])
 	return userInfo, nil
 }
 
 func (s *userService) getXUserInfo(ctx context.Context, config *oauth2.Config, code string) (map[string]interface{}, error) {
+	fmt.Printf("🔄 Exchanging X OAuth code for token...\n")
 	token, err := config.Exchange(ctx, code)
 	if err != nil {
-		return nil, err
+		fmt.Printf("❌ Failed to exchange X OAuth code: %v\n", err)
+		return nil, fmt.Errorf("failed to exchange code for token: %w", err)
 	}
+	fmt.Printf("✅ Successfully obtained X OAuth token\n")
 
 	client := config.Client(ctx, token)
+	fmt.Printf("🔄 Fetching X user info...\n")
 	resp, err := client.Get("https://api.x.com/2/users/me?user.fields=id,username,name,profile_image_url")
 	if err != nil {
-		return nil, err
+		fmt.Printf("❌ Failed to fetch X user info: %v\n", err)
+		return nil, fmt.Errorf("failed to get user info: %w", err)
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != 200 {
+		fmt.Printf("❌ X API returned status %d\n", resp.StatusCode)
+		return nil, fmt.Errorf("X API returned status %d", resp.StatusCode)
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		fmt.Printf("❌ Failed to read X user response: %v\n", err)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
+
+	fmt.Printf("📄 X user response: %s\n", string(body))
 
 	var response map[string]interface{}
 	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, err
+		fmt.Printf("❌ Failed to parse X user response: %v\n", err)
+		return nil, fmt.Errorf("failed to parse user info: %w", err)
 	}
 
 	// Extract user data from X API response
 	data, ok := response["data"].(map[string]interface{})
 	if !ok {
+		fmt.Printf("❌ Invalid X API response format - missing 'data' field\n")
 		return nil, errors.New("invalid response format from X API")
+	}
+
+	// X doesn't provide email by default with OAuth 2.0
+	username, _ := data["username"].(string)
+	email := fmt.Sprintf("x_%s@x.local", username)
+	if username == "" {
+		if userID, ok := data["id"].(string); ok {
+			email = fmt.Sprintf("x_%s@x.local", userID)
+		}
 	}
 
 	userInfo := map[string]interface{}{
 		"id":      data["id"],
 		"name":    data["name"],
-		"email":   data["username"].(string) + "@x.local", // X doesn't provide email by default
+		"email":   email,
 		"picture": data["profile_image_url"],
 	}
 
+	fmt.Printf("✅ Successfully retrieved X user info for ID: %v\n", userInfo["id"])
 	return userInfo, nil
 }
 
