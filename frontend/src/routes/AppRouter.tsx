@@ -1,12 +1,14 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { HomePage } from '@/pages/HomePage'
 import { DocumentationPage } from '@/pages/DocumentationPage'
-import { MockTestPage } from '@/pages/MockTestPage'
-import { TimeQuizPage } from '@/pages/TimeQuizPage'
+import MockTestPage from '@/pages/MockTestPage'
+import TimeQuizPage from '@/pages/TimeQuizPage'
 import { AuthPage } from '@/pages/AuthPage'
 import { AdminPage } from '@/pages/AdminPage'
 import { ProfilePage } from '@/pages/ProfilePage'
 import { ResultsPage } from '@/pages/ResultsPage'
+import { OAuthCallbackPage } from '@/pages/OAuthCallbackPage'
+import { PrivacyPage } from '@/pages/PrivacyPage'
 
 export const AppRouter = () => {
   return (
@@ -24,6 +26,8 @@ export const AppRouter = () => {
         
         {/* Auth Routes */}
         <Route path="/login" element={<AuthPage />} />
+        <Route path="/oauth-callback" element={<OAuthCallbackPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
         
         {/* User Routes */}
         <Route path="/profile" element={<ProfilePage />} />

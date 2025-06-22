@@ -67,7 +67,7 @@ func main() {
 	quizSessionController := controllers.NewQuizSessionController(quizSessionService)
 
 	// Development-only controller for quick login helpers
-	devController := controllers.NewDevController(userService)
+	devController := controllers.NewDevController(userService, userRepo, jwtManager)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(jwtManager)

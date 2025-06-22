@@ -62,7 +62,8 @@ export const HomeNavbar = () => {
     navigate('/results')
   }
 
-  const getUserInitials = (fullName: string) => {
+  const getUserInitials = (fullName: string | undefined) => {
+    if (!fullName) return 'U'
     return fullName.split(' ').map(n => n[0]).join('').toUpperCase()
   }
 
@@ -87,15 +88,15 @@ export const HomeNavbar = () => {
                         </AvatarFallback>
                       </Avatar>
                       <span className="hidden lg:block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {user.full_name.split(' ')[0]}
+                        {user.full_name?.split(' ')[0] || 'User'}
                       </span>
                       <ChevronDown className="w-4 h-4 text-gray-500" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56 z-[70]">
                     <div className="px-3 py-2 border-b">
-                      <p className="text-sm font-medium">{user.full_name}</p>
-                      <p className="text-xs text-muted-foreground">{user.email}</p>
+                      <p className="text-sm font-medium">{user.full_name || 'User'}</p>
+                      <p className="text-xs text-muted-foreground">{user.email || 'user@example.com'}</p>
                     </div>
                     <DropdownMenuItem onClick={handleProfileClick}>
                       <User className="w-4 h-4 mr-2" />
@@ -168,8 +169,8 @@ export const HomeNavbar = () => {
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{user.full_name}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{user.email}</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{user.full_name || 'User'}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{user.email || 'user@example.com'}</p>
                     </div>
                   </div>
                   

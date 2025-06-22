@@ -13,6 +13,9 @@ import (
 func SetupDevRoutes(api *gin.RouterGroup, devController *controllers.DevController) {
 	dev := api.Group("/dev")
 
+	// Get available dev users for frontend display
+	dev.GET("/users", devController.GetDevUsers)
+
 	// Quick login helpers – no auth required because they are only exposed in dev.
 	dev.POST("/login-admin", devController.LoginAdmin)
 	dev.POST("/login-student", devController.LoginStudent)

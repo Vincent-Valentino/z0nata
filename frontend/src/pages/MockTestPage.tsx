@@ -1,312 +1,325 @@
-import { HomeNavbar } from '@/components/block/home'
-import { useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useQuiz } from '@/contexts/QuizContext'
+import {
+  MockTestHeader,
+  MockTestWelcome,
+  MockTestLoading,
+  MockTestExpired,
+  MockTestNavigationPanel,
+  MockTestQuestionCard,
+  MockTestControls,
+  MockTestReviewModal,
+  type QuestionStats,
+  type QuestionFilter,
+  type FilteredQuestion
+} from '@/components/block/mock-test'
 
-interface Question {
-  id: number
-  type: 'single' | 'multiple' | 'essay'
-  question: string
-  options?: string[]
-  correctAnswer?: string | string[]
-}
+const MockTestPage: React.FC = () => {
+  const navigate = useNavigate()
+  const { 
+    state, 
+    startQuiz, 
+    resumeQuiz, 
+    submitQuiz, 
+    goToQuestion, 
+    nextQuestion, 
+    previousQuestion,
+    saveAnswer, 
+    skipQuestion,
+    resetQuiz,
+    getCurrentQuestion,
+    checkForActiveSession
+  } = useQuiz()
 
-export const MockTestPage = () => {
-  const [currentQuestion, setCurrentQuestion] = useState(0)
-  const [answers, setAnswers] = useState<Record<number, any>>({})
-  const [selectedAnswers, setSelectedAnswers] = useState<string[]>([])
-  const [essayAnswer, setEssayAnswer] = useState('')
-  const [showResults, setShowResults] = useState(false)
+  const [selectedAnswer, setSelectedAnswer] = useState<string | string[]>('')
+  const [isInitialized, setIsInitialized] = useState(false)
+  const [showQuestionPanel, setShowQuestionPanel] = useState(true)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [questionFilter, setQuestionFilter] = useState<QuestionFilter>({
+    difficulty: 'all',
+    status: 'all',
+    type: 'all'
+  })
+  const [showReviewMode, setShowReviewMode] = useState(false)
+  const [showStats, setShowStats] = useState(false)
 
-  const questions: Question[] = [
-    {
-      id: 1,
-      type: 'single',
-      question: 'Apa yang dimaksud dengan Artificial Intelligence?',
-      options: [
-        'Simulasi kecerdasan manusia dalam mesin',
-        'Program komputer biasa',
-        'Sistem operasi canggih',
-        'Database yang kompleks'
-      ],
-      correctAnswer: 'Simulasi kecerdasan manusia dalam mesin'
-    },
-    {
-      id: 2,
-      type: 'multiple',
-      question: 'Manakah yang termasuk dalam kategori Machine Learning? (Pilih lebih dari satu)',
-      options: [
-        'Supervised Learning',
-        'Unsupervised Learning',
-        'HTML Programming',
-        'Reinforcement Learning',
-        'CSS Styling'
-      ],
-      correctAnswer: ['Supervised Learning', 'Unsupervised Learning', 'Reinforcement Learning']
-    },
-    {
-      id: 3,
-      type: 'essay',
-      question: 'Jelaskan perbedaan antara Machine Learning dan Deep Learning dalam konteks AI!',
-      correctAnswer: ''
-    }
-  ]
-
-  const handleSingleChoice = (answer: string) => {
-    setAnswers(prev => ({ ...prev, [currentQuestion]: answer }))
-  }
-
-  const handleMultipleChoice = (option: string) => {
-    const newSelection = selectedAnswers.includes(option)
-      ? selectedAnswers.filter(a => a !== option)
-      : [...selectedAnswers, option]
-    
-    setSelectedAnswers(newSelection)
-    setAnswers(prev => ({ ...prev, [currentQuestion]: newSelection }))
-  }
-
-  const handleEssayChange = (value: string) => {
-    setEssayAnswer(value)
-    setAnswers(prev => ({ ...prev, [currentQuestion]: value }))
-  }
-
-  const nextQuestion = () => {
-    if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion(prev => prev + 1)
-      setSelectedAnswers([])
-      setEssayAnswer('')
-    } else {
-      setShowResults(true)
-    }
-  }
-
-  const prevQuestion = () => {
-    if (currentQuestion > 0) {
-      setCurrentQuestion(prev => prev - 1)
-      const prevAnswer = answers[currentQuestion - 1]
-      if (Array.isArray(prevAnswer)) {
-        setSelectedAnswers(prevAnswer)
-      } else if (typeof prevAnswer === 'string') {
-        setEssayAnswer(prevAnswer)
+  // Initialize quiz on page load
+  useEffect(() => {
+    const initializeQuiz = async () => {
+      if (!isInitialized) {
+        setIsInitialized(true)
+        
+        // Check for existing session first
+        const hasActiveSession = await checkForActiveSession()
+        if (hasActiveSession) {
+          await resumeQuiz()
+        }
       }
     }
-  }
 
-  const calculateScore = () => {
-    let correct = 0
+    initializeQuiz()
+  }, [isInitialized, checkForActiveSession, resumeQuiz])
+
+  // Update selected answer when question changes
+  useEffect(() => {
+    if (state.session) {
+      const currentAnswer = state.answers.get(state.currentQuestionIndex)
+      setSelectedAnswer(currentAnswer || '')
+    }
+  }, [state.currentQuestionIndex, state.answers, state.session])
+
+  // Handle quiz completion
+  useEffect(() => {
+    if (state.showResults && state.result) {
+      navigate('/results', { state: { result: state.result } })
+    }
+  }, [state.showResults, state.result, navigate])
+
+  // Calculate question statistics
+  const questionStats: QuestionStats = useMemo(() => {
+    if (!state.session) {
+      return {
+        total: 0, answered: 0, skipped: 0,
+        easy: 0, medium: 0, hard: 0,
+        easyAnswered: 0, mediumAnswered: 0, hardAnswered: 0
+      }
+    }
+
+    const questions = state.session.questions
+    const stats = {
+      total: questions.length,
+      answered: state.answeredQuestions.size,
+      skipped: state.skippedQuestions.size,
+      easy: questions.filter(q => q.difficulty === 'easy').length,
+      medium: questions.filter(q => q.difficulty === 'medium').length,
+      hard: questions.filter(q => q.difficulty === 'hard').length,
+      easyAnswered: 0,
+      mediumAnswered: 0,
+      hardAnswered: 0
+    }
+
+    // Count answered by difficulty
     questions.forEach((q, index) => {
-      const userAnswer = answers[index]
-      if (q.type === 'single' && userAnswer === q.correctAnswer) {
-        correct++
-      } else if (q.type === 'multiple' && Array.isArray(userAnswer) && Array.isArray(q.correctAnswer)) {
-        if (userAnswer.length === q.correctAnswer.length && 
-            userAnswer.every(a => q.correctAnswer?.includes(a))) {
-          correct++
+      if (state.answeredQuestions.has(index)) {
+        switch (q.difficulty) {
+          case 'easy': stats.easyAnswered++; break
+          case 'medium': stats.mediumAnswered++; break
+          case 'hard': stats.hardAnswered++; break
         }
       }
     })
-    return Math.round((correct / questions.filter(q => q.type !== 'essay').length) * 100)
+
+    return stats
+  }, [state.session, state.answeredQuestions, state.skippedQuestions])
+
+  // Filter questions based on current filters and search
+  const filteredQuestions: FilteredQuestion[] = useMemo(() => {
+    if (!state.session) return []
+
+    let filtered = state.session.questions.map((q, index) => ({ question: q, index }))
+
+    // Apply difficulty filter
+    if (questionFilter.difficulty !== 'all') {
+      filtered = filtered.filter(item => item.question.difficulty === questionFilter.difficulty)
+    }
+
+    // Apply status filter
+    if (questionFilter.status !== 'all') {
+      filtered = filtered.filter(item => {
+        switch (questionFilter.status) {
+          case 'answered': return state.answeredQuestions.has(item.index)
+          case 'unanswered': return !state.answeredQuestions.has(item.index) && !state.skippedQuestions.has(item.index)
+          case 'skipped': return state.skippedQuestions.has(item.index)
+          default: return true
+        }
+      })
+    }
+
+    // Apply type filter
+    if (questionFilter.type !== 'all') {
+      filtered = filtered.filter(item => item.question.type === questionFilter.type)
+    }
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(item => 
+        item.question.title.toLowerCase().includes(query) ||
+        item.question.options.some(opt => opt.text.toLowerCase().includes(query))
+      )
+    }
+
+    return filtered
+  }, [state.session, questionFilter, searchQuery, state.answeredQuestions, state.skippedQuestions])
+
+  // Event handlers
+  const handleStartQuiz = async () => {
+    await startQuiz('mock_test')
   }
 
-  if (showResults) {
-    const score = calculateScore()
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50">
-        <HomeNavbar />
-        <div className="pt-24 pb-16">
-          <div className="container mx-auto max-w-4xl px-4">
-            <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 text-center">
-              <div className="mb-8">
-                <div className={`text-6xl font-bold mb-4 ${score >= 70 ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {score}%
-                </div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-2">
-                  {score >= 70 ? 'Selamat!' : 'Perlu Belajar Lagi'}
-                </h2>
-                <p className="text-gray-600">
-                  {score >= 70 
-                    ? 'Anda berhasil menyelesaikan mock test dengan baik!'
-                    : 'Jangan menyerah, terus belajar untuk hasil yang lebih baik!'
-                  }
-                </p>
-              </div>
-              
-              <div className="grid md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200">
-                  <div className="text-2xl font-bold text-emerald-600">{questions.length}</div>
-                  <div className="text-sm text-gray-600">Total Soal</div>
-                </div>
-                <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {Math.round((score / 100) * questions.filter(q => q.type !== 'essay').length)}
-                  </div>
-                  <div className="text-sm text-gray-600">Benar</div>
-                </div>
-                <div className="bg-red-50 p-4 rounded-xl border border-red-200">
-                  <div className="text-2xl font-bold text-red-600">
-                    {questions.filter(q => q.type !== 'essay').length - Math.round((score / 100) * questions.filter(q => q.type !== 'essay').length)}
-                  </div>
-                  <div className="text-sm text-gray-600">Salah</div>
-                </div>
-              </div>
+  const handleAnswerSelect = async (optionId: string) => {
+    const currentQuestion = getCurrentQuestion()
+    if (!currentQuestion || state.isExpired) return
 
-              <div className="flex gap-4 justify-center">
-                <button
-                  onClick={() => {
-                    setCurrentQuestion(0)
-                    setAnswers({})
-                    setSelectedAnswers([])
-                    setEssayAnswer('')
-                    setShowResults(false)
-                  }}
-                  className="px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-                >
-                  Ulangi Test
-                </button>
-                <button
-                  onClick={() => window.location.href = '/dokumentasi'}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Pelajari Materi
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+    let newAnswer: string | string[]
+    
+    if (currentQuestion.type === 'multiple_choice') {
+      // Handle multiple choice
+      const currentAnswers = Array.isArray(selectedAnswer) ? selectedAnswer : []
+      if (currentAnswers.includes(optionId)) {
+        newAnswer = currentAnswers.filter(id => id !== optionId)
+      } else {
+        newAnswer = [...currentAnswers, optionId]
+      }
+    } else {
+      // Handle single choice
+      newAnswer = optionId
+    }
+
+    setSelectedAnswer(newAnswer)
+
+    // Save answer without immediate feedback for MockTest
+    await saveAnswer(state.currentQuestionIndex, newAnswer, false)
+  }
+
+  const handleSkipQuestion = async () => {
+    await skipQuestion(state.currentQuestionIndex)
+    
+    if (state.currentQuestionIndex < state.totalQuestions - 1) {
+      await nextQuestion()
+    }
+  }
+
+  const handleQuestionNavigation = async (questionIndex: number) => {
+    await goToQuestion(questionIndex)
+  }
+
+  const handleSubmitQuiz = async () => {
+    await submitQuiz()
+  }
+
+  const clearFilters = () => {
+    setQuestionFilter({
+      difficulty: 'all',
+      status: 'all',
+      type: 'all'
+    })
+    setSearchQuery('')
+  }
+
+  const currentQuestion = getCurrentQuestion()
+  const isAnswered = state.answeredQuestions.has(state.currentQuestionIndex)
+  const isSkipped = state.skippedQuestions.has(state.currentQuestionIndex)
+
+  // Loading state
+  if (state.isLoading) {
+    return <MockTestLoading />
+  }
+
+  // Quiz not started state
+  if (!state.session) {
+    return (
+      <MockTestWelcome
+        onStartQuiz={handleStartQuiz}
+        isLoading={state.isLoading}
+        error={state.error}
+      />
     )
   }
 
-  const question = questions[currentQuestion]
+  // Quiz expired state
+  if (state.isExpired) {
+    return (
+      <MockTestExpired
+        onSubmitQuiz={handleSubmitQuiz}
+        onResetQuiz={resetQuiz}
+        isSubmitting={state.isSubmitting}
+      />
+    )
+  }
 
+  // Main quiz interface
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50">
-      <HomeNavbar />
-      
-      {/* Header */}
-      <div className="pt-24 pb-8">
-        <div className="container mx-auto max-w-4xl px-4">
-          <div className="text-center">
-            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-              Mock 
-              <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent"> Test</span>
-            </h1>
-            <p className="text-lg text-gray-600">
-              Simulasi ujian HCIA-AI untuk mengukur pemahaman Anda
-            </p>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 p-4">
+      <div className="max-w-7xl mx-auto space-y-6">
+        
+        {/* Header with Timer and Progress */}
+        <MockTestHeader
+          timeRemaining={state.timeRemaining}
+          currentQuestionIndex={state.currentQuestionIndex}
+          totalQuestions={state.totalQuestions}
+          progressPercentage={state.progressPercentage}
+          questionStats={questionStats}
+          showStats={showStats}
+          showQuestionPanel={showQuestionPanel}
+          onToggleStats={() => setShowStats(!showStats)}
+          onToggleQuestionPanel={() => setShowQuestionPanel(!showQuestionPanel)}
+        />
 
-      {/* Progress Bar */}
-      <div className="container mx-auto max-w-4xl px-4 mb-8">
-        <div className="bg-white rounded-full p-1 shadow-sm border border-gray-200">
-          <div 
-            className="bg-gradient-to-r from-emerald-500 to-teal-500 h-3 rounded-full transition-all duration-300"
-            style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }}
-          ></div>
-        </div>
-        <div className="flex justify-between mt-2 text-sm text-gray-600">
-          <span>Soal {currentQuestion + 1} dari {questions.length}</span>
-          <span>{Math.round(((currentQuestion + 1) / questions.length) * 100)}% selesai</span>
-        </div>
-      </div>
+        <div className={`grid ${showQuestionPanel ? 'grid-cols-1 lg:grid-cols-4' : 'grid-cols-1'} gap-6`}>
+          
+          {/* Advanced Question Navigation Panel */}
+          {showQuestionPanel && (
+            <MockTestNavigationPanel
+              viewMode={viewMode}
+              searchQuery={searchQuery}
+              questionFilter={questionFilter}
+              filteredQuestions={filteredQuestions}
+              currentQuestionIndex={state.currentQuestionIndex}
+              answeredQuestions={state.answeredQuestions}
+              skippedQuestions={state.skippedQuestions}
+              onViewModeChange={setViewMode}
+              onSearchChange={setSearchQuery}
+              onFilterChange={setQuestionFilter}
+              onClearFilters={clearFilters}
+              onQuestionNavigation={handleQuestionNavigation}
+            />
+          )}
 
-      {/* Question Content */}
-      <div className="container mx-auto max-w-4xl px-4 pb-16">
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8">
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-4">
-              <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-sm font-medium">
-                {question.type === 'single' ? 'Pilihan Tunggal' : 
-                 question.type === 'multiple' ? 'Pilihan Berganda' : 'Essay'}
-              </span>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 leading-relaxed">
-              {question.question}
-            </h2>
-          </div>
-
-          {/* Answer Options */}
-          <div className="space-y-4 mb-8">
-            {question.type === 'single' && question.options?.map((option, index) => (
-              <button
-                key={index}
-                onClick={() => handleSingleChoice(option)}
-                className={`w-full text-left p-4 rounded-lg border-2 transition-all duration-200 ${
-                  answers[currentQuestion] === option
-                    ? 'border-emerald-500 bg-emerald-50'
-                    : 'border-gray-200 hover:border-emerald-300 hover:bg-emerald-50'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-4 h-4 rounded-full border-2 ${
-                    answers[currentQuestion] === option
-                      ? 'border-emerald-500 bg-emerald-500'
-                      : 'border-gray-300'
-                  }`}>
-                    {answers[currentQuestion] === option && (
-                      <div className="w-2 h-2 bg-white rounded-full m-0.5"></div>
-                    )}
-                  </div>
-                  <span className="text-gray-800">{option}</span>
-                </div>
-              </button>
-            ))}
-
-            {question.type === 'multiple' && question.options?.map((option, index) => (
-              <button
-                key={index}
-                onClick={() => handleMultipleChoice(option)}
-                className={`w-full text-left p-4 rounded-lg border-2 transition-all duration-200 ${
-                  selectedAnswers.includes(option)
-                    ? 'border-emerald-500 bg-emerald-50'
-                    : 'border-gray-200 hover:border-emerald-300 hover:bg-emerald-50'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-4 h-4 rounded border-2 ${
-                    selectedAnswers.includes(option)
-                      ? 'border-emerald-500 bg-emerald-500'
-                      : 'border-gray-300'
-                  }`}>
-                    {selectedAnswers.includes(option) && (
-                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </div>
-                  <span className="text-gray-800">{option}</span>
-                </div>
-              </button>
-            ))}
-
-            {question.type === 'essay' && (
-              <textarea
-                value={essayAnswer}
-                onChange={(e) => handleEssayChange(e.target.value)}
-                placeholder="Tulis jawaban Anda di sini..."
-                className="w-full h-40 p-4 border-2 border-gray-200 rounded-lg focus:border-emerald-500 focus:outline-none resize-none"
+          {/* Main Question Area */}
+          <div className={`${showQuestionPanel ? 'lg:col-span-3 lg:order-1' : ''} space-y-6`}>
+            
+            {/* Question Card */}
+            {currentQuestion && (
+              <MockTestQuestionCard
+                question={currentQuestion}
+                selectedAnswer={selectedAnswer}
+                isAnswered={isAnswered}
+                isSkipped={isSkipped}
+                isExpired={state.isExpired}
+                onAnswerSelect={handleAnswerSelect}
               />
             )}
-          </div>
 
-          {/* Navigation */}
-          <div className="flex justify-between">
-            <button
-              onClick={prevQuestion}
-              disabled={currentQuestion === 0}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Sebelumnya
-            </button>
-            <button
-              onClick={nextQuestion}
-              className="px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-            >
-              {currentQuestion === questions.length - 1 ? 'Selesai' : 'Selanjutnya'}
-            </button>
+            {/* Navigation Controls */}
+            <MockTestControls
+              currentQuestionIndex={state.currentQuestionIndex}
+              totalQuestions={state.totalQuestions}
+              isAnswered={isAnswered}
+              isSkipped={isSkipped}
+              isSubmitting={state.isSubmitting}
+              onPreviousQuestion={previousQuestion}
+              onNextQuestion={nextQuestion}
+              onSkipQuestion={handleSkipQuestion}
+              onShowReview={() => setShowReviewMode(true)}
+              onSubmitQuiz={handleSubmitQuiz}
+            />
           </div>
         </div>
+
+        {/* Review Mode Modal */}
+        <MockTestReviewModal
+          isOpen={showReviewMode}
+          questionStats={questionStats}
+          isSubmitting={state.isSubmitting}
+          onClose={() => setShowReviewMode(false)}
+          onSubmitQuiz={handleSubmitQuiz}
+        />
       </div>
     </div>
   )
-} 
+}
+
+export default MockTestPage 

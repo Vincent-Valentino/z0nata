@@ -8,7 +8,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Progress } from '@/components/ui/progress'
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -18,13 +17,12 @@ import {
   Search,
   BookOpen,
   FileText,
-  CheckCircle2,
-  Clock,
-  Users,
   GraduationCap,
   Home,
   Settings,
-  HelpCircle
+  HelpCircle,
+  Sun,
+  Moon,
 } from 'lucide-react'
 import { moduleService, type Module } from '@/services/moduleService'
 
@@ -35,22 +33,17 @@ interface DocSection {
   icon: React.ReactNode
   description: string
   items?: DocItem[]
-  progress?: number
-  isCompleted?: boolean
 }
 
 interface DocItem {
   id: string
   title: string
   level: number
-  isCompleted?: boolean
-  duration?: string
 }
 
 const DocumentationContent = () => {
   const { resolvedTheme } = useTheme()
   const [activeSection, setActiveSection] = useState('')
-  const [activeItem, setActiveItem] = useState<string>()
   const [isLoading, setIsLoading] = useState(true)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [modules, setModules] = useState<Module[]>([])
@@ -85,22 +78,18 @@ const DocumentationContent = () => {
       const response = await moduleService.getModules({ published: true, limit: 100 })
       setModules(response.modules || [])
       
-      // Convert modules to sections format with enhanced UI data
-      const docSections: DocSection[] = (response.modules || []).map((module, index) => ({
+      // Convert modules to sections format
+      const docSections: DocSection[] = (response.modules || []).map((module, _) => ({
         id: module.id,
         title: module.name,
         description: module.description,
         icon: <BookOpen className="w-5 h-5" />,
-        progress: Math.random() * 100, // Mock progress - replace with actual data
-        isCompleted: Math.random() > 0.7, // Mock completion - replace with actual data
         items: (module.sub_modules || [])
           .filter(sub => sub.is_published)
-          .map((subModule, subIndex) => ({
+          .map((subModule, _) => ({
             id: subModule.id,
             title: subModule.name,
-            level: 1,
-            isCompleted: Math.random() > 0.5, // Mock completion
-            duration: `${Math.floor(Math.random() * 20 + 5)} min` // Mock duration
+            level: 1
           }))
       }))
       
@@ -146,7 +135,6 @@ const DocumentationContent = () => {
   // Handle section change
   const handleSectionChange = (sectionId: string) => {
     setActiveSection(sectionId)
-    setActiveItem(undefined)
     setIsSidebarOpen(false)
     
     const url = new URL(window.location.href)
@@ -169,14 +157,12 @@ const DocumentationContent = () => {
     
     if (isSubModule) {
       setActiveSection(itemId)
-      setActiveItem(undefined)
       setIsSidebarOpen(false)
       
       const url = new URL(window.location.href)
       url.searchParams.set('section', itemId)
       window.history.replaceState({}, '', url.toString())
     } else {
-      setActiveItem(itemId)
       setIsSidebarOpen(false)
       
       setTimeout(() => {
@@ -234,17 +220,19 @@ const DocumentationContent = () => {
 
   // Enhanced Sidebar Component
   const EnhancedSidebar = ({ className = "" }: { className?: string }) => (
-    <div className={cn("flex flex-col h-full bg-background", className)}>
+    <div className={cn("flex flex-col h-full bg-background border-r border-border", className)}>
       {/* Sidebar Header */}
-      <div className="p-4 border-b border-border">
+      <div className="p-4 border-b border-border bg-card">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-sm">
             <GraduationCap className="w-4 h-4 text-white" />
           </div>
-          <div>
+          <div className="flex-1">
             <h2 className="font-semibold text-foreground">Documentation</h2>
             <p className="text-xs text-muted-foreground">Learn and explore</p>
           </div>
+          {/* Desktop Dark Mode Toggle */}
+          <DarkModeToggle />
         </div>
         
         {/* Search */}
@@ -260,140 +248,148 @@ const DocumentationContent = () => {
       </div>
 
       {/* Progress Overview */}
-      <div className="p-4 border-b border-border bg-muted/20">
+      <div className="p-4 border-b border-border bg-muted/30">
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Overall Progress</span>
-            <span className="font-medium">
-              {Math.round(sections.reduce((acc, s) => acc + (s.progress || 0), 0) / sections.length || 0)}%
-            </span>
+          <div className="text-sm font-medium text-foreground text-center">
+            Documentation Library
           </div>
-          <Progress 
-            value={sections.reduce((acc, s) => acc + (s.progress || 0), 0) / sections.length || 0} 
-            className="h-2"
-          />
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{sections.filter(s => s.isCompleted).length} completed</span>
-            <span>{sections.length} total modules</span>
+            <span>{sections.length} modules available</span>
+            <span>Always up to date</span>
           </div>
         </div>
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 overflow-y-auto p-2">
-        <div className="space-y-1">
+      <div className="flex-1 overflow-y-auto p-3">
+        <div className="space-y-3">
           {filteredSections.map((section, index) => (
-            <div key={section.id} className="space-y-1">
+            <div key={section.id} className="space-y-2">
               {/* Module */}
-              <Button
-                variant={activeSection === section.id ? "secondary" : "ghost"}
-                onClick={() => handleSectionChange(section.id)}
+              <div
                 className={cn(
-                  "w-full justify-start text-left h-auto p-3 relative group",
-                  activeSection === section.id && "bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800"
+                  "rounded-xl border transition-all duration-200 overflow-hidden",
+                  activeSection === section.id 
+                    ? "border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 shadow-sm" 
+                    : "border-border bg-card hover:border-blue-200 dark:hover:border-blue-700 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 hover:shadow-sm"
                 )}
               >
-                <div className="flex items-start gap-3 w-full">
-                  <div className={cn(
-                    "p-1.5 rounded-md shrink-0 transition-colors",
-                    activeSection === section.id 
-                      ? "bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-400"
-                      : "bg-muted text-muted-foreground group-hover:bg-emerald-100 group-hover:text-emerald-600"
-                  )}>
-                    {section.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium text-sm truncate">
-                        {index + 1}. {section.title}
-                      </span>
-                      <div className="flex items-center gap-1 shrink-0 ml-2">
-                        {section.isCompleted && (
-                          <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                        )}
-                        <span className="text-xs text-muted-foreground">
-                          {section.progress}%
+                <Button
+                  variant="ghost"
+                  onClick={() => handleSectionChange(section.id)}
+                  className="w-full justify-start text-left h-auto p-4 hover:bg-transparent"
+                >
+                  <div className="flex items-start gap-3 w-full">
+                    <div className={cn(
+                      "p-2.5 rounded-lg shrink-0 transition-all duration-200",
+                      activeSection === section.id 
+                        ? "bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 shadow-sm"
+                        : "bg-muted text-muted-foreground"
+                    )}>
+                      {section.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={cn(
+                          "font-semibold text-sm truncate transition-colors",
+                          activeSection === section.id 
+                            ? "text-blue-700 dark:text-blue-300" 
+                            : "text-foreground"
+                        )}>
+                          {index + 1}. {section.title}
                         </span>
                       </div>
+                      <p className="text-xs text-muted-foreground line-clamp-2 text-left leading-relaxed">
+                        {section.description}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground line-clamp-2 text-left">
-                      {section.description}
-                    </p>
-                    {section.progress !== undefined && (
-                      <Progress value={section.progress} className="h-1 mt-2" />
-                    )}
                   </div>
-                </div>
-              </Button>
+                </Button>
 
-              {/* Submodules */}
-              {section.items && section.items.length > 0 && (
-                <div className="ml-4 space-y-1">
-                  {section.items.map((item, itemIndex) => (
-                    <Button
-                      key={item.id}
-                      variant={activeSection === item.id ? "secondary" : "ghost"}
-                      onClick={() => handleItemClick(item.id)}
-                      className={cn(
-                        "w-full justify-start text-left h-auto p-2 group",
-                        activeSection === item.id && "bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800"
-                      )}
-                    >
-                      <div className="flex items-center gap-2 w-full">
-                        <div className={cn(
-                          "w-1.5 h-1.5 rounded-full shrink-0",
-                          item.isCompleted 
-                            ? "bg-emerald-500" 
-                            : activeSection === item.id
-                            ? "bg-emerald-400"
-                            : "bg-muted-foreground"
-                        )} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm truncate">
+                {/* Submodules */}
+                {section.items && section.items.length > 0 && (
+                  <div className="px-4 pb-3">
+                    <div className="ml-3 border-l-2 border-muted pl-4 space-y-1">
+                      {section.items.map((item, itemIndex) => (
+                        <Button
+                          key={item.id}
+                          variant="ghost"
+                          onClick={() => handleItemClick(item.id)}
+                          className={cn(
+                            "w-full justify-start text-left h-auto p-2.5 rounded-lg transition-all duration-200",
+                            activeSection === item.id 
+                              ? "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 shadow-sm" 
+                              : "hover:bg-muted/60 text-foreground hover:text-blue-600 dark:hover:text-blue-400"
+                          )}
+                        >
+                          <div className="flex items-center gap-3 w-full">
+                            <div className={cn(
+                              "w-2 h-2 rounded-full shrink-0 transition-all duration-200",
+                              activeSection === item.id
+                                ? "bg-blue-500 dark:bg-blue-400"
+                                : "bg-muted-foreground/40"
+                            )} />
+                            <span className="text-sm truncate font-medium">
                               {index + 1}.{itemIndex + 1} {item.title}
                             </span>
-                            <div className="flex items-center gap-1 shrink-0 ml-2">
-                              {item.isCompleted && (
-                                <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                              )}
-                              {item.duration && (
-                                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                  <Clock className="w-3 h-3" />
-                                  {item.duration}
-                                </span>
-                              )}
-                            </div>
                           </div>
-                        </div>
-                      </div>
-                    </Button>
-                  ))}
-                </div>
-              )}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
       </div>
 
       {/* Sidebar Footer */}
-      <div className="p-4 border-t border-border bg-muted/20">
-        <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-          <span>Quick Actions</span>
+      <div className="p-4 border-t border-border bg-card">
+        <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
+          <span className="font-medium">Quick Actions</span>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <Button variant="outline" size="sm" className="h-8 text-xs">
-            <Home className="w-3 h-3 mr-1" />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleHomeClick}
+            className="h-9 text-xs font-medium bg-background hover:bg-blue-50 dark:bg-muted/20 dark:hover:bg-blue-950/40 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-200 dark:hover:border-blue-700 border-muted dark:border-muted/50 text-foreground"
+          >
+            <Home className="w-3 h-3 mr-1.5" />
             Home
           </Button>
-          <Button variant="outline" size="sm" className="h-8 text-xs">
-            <HelpCircle className="w-3 h-3 mr-1" />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleHelpClick}
+            className="h-9 text-xs font-medium bg-background hover:bg-blue-50 dark:bg-muted/20 dark:hover:bg-blue-950/40 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-200 dark:hover:border-blue-700 border-muted dark:border-muted/50 text-foreground"
+          >
+            <HelpCircle className="w-3 h-3 mr-1.5" />
             Help
           </Button>
         </div>
       </div>
     </div>
   )
+
+  // Dark Mode Toggle Component
+  const DarkModeToggle = () => {
+    const { theme, setTheme } = useTheme()
+    
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        className="h-8 w-8 p-0 hover:bg-muted/50 dark:hover:bg-muted/20"
+      >
+        <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+        <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+        <span className="sr-only">Toggle theme</span>
+      </Button>
+    )
+  }
 
   // Enhanced Mobile Navbar
   const EnhancedMobileNavbar = () => (
@@ -409,7 +405,7 @@ const DocumentationContent = () => {
             <Menu className="w-4 h-4" />
           </Button>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-md flex items-center justify-center">
+            <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-md flex items-center justify-center shadow-sm">
               <GraduationCap className="w-3 h-3 text-white" />
             </div>
             <span className="font-semibold text-sm">Docs</span>
@@ -420,6 +416,8 @@ const DocumentationContent = () => {
           <Button variant="ghost" size="sm" onClick={() => setIsSearchOpen(true)}>
             <Search className="w-4 h-4" />
           </Button>
+          {/* Mobile Dark Mode Toggle */}
+          <DarkModeToggle />
           <Button variant="ghost" size="sm">
             <Settings className="w-4 h-4" />
           </Button>
@@ -428,7 +426,7 @@ const DocumentationContent = () => {
       
       {/* Current section indicator */}
       <div className="px-4 pb-3">
-        <div className="text-xs text-muted-foreground">
+        <div className="text-xs text-muted-foreground font-medium">
           {(() => {
             const section = sections.find(s => s.id === activeSection)
             if (section) {
@@ -450,13 +448,20 @@ const DocumentationContent = () => {
             return 'Documentation'
           })()}
         </div>
-        <Progress 
-          value={sections.find(s => s.id === activeSection)?.progress || 0} 
-          className="h-1 mt-1"
-        />
       </div>
     </div>
   )
+
+  // Handle quick actions
+  const handleHomeClick = () => {
+    window.location.href = '/'
+  }
+
+  const handleHelpClick = () => {
+    // You can implement help functionality here
+    // For now, let's show an alert or open a help dialog
+    alert('Help functionality - You can implement this to show help documentation or open a help modal.')
+  }
 
   if (isLoading) {
     return (
@@ -475,15 +480,23 @@ const DocumentationContent = () => {
 
   return (
     <div className={cn(
-      "min-h-screen transition-colors duration-200 overflow-x-hidden",
+      "min-h-screen transition-colors duration-200 overflow-x-hidden relative",
       resolvedTheme === 'dark' ? 'dark' : '',
       "bg-background"
     )}>
+      {/* Dark mode liquid glass background - MAIN BACKGROUND */}
+      <div className="fixed inset-0 opacity-0 dark:opacity-100 pointer-events-none z-0">
+        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-blue-900/8 via-purple-900/4 to-slate-900/8"></div>
+        <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-gradient-to-l from-blue-500/8 to-transparent rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/3 left-1/4 w-80 h-80 bg-gradient-to-r from-purple-500/6 to-transparent rounded-full blur-2xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-tr from-cyan-500/4 to-transparent rounded-full blur-xl animate-pulse" style={{ animationDelay: '4s' }}></div>
+      </div>
+      
       {/* Enhanced Mobile Navbar */}
       <EnhancedMobileNavbar />
       
       {/* Main Layout */}
-      <div className="pt-24 lg:pt-0 flex relative">
+      <div className="pt-24 lg:pt-0 flex relative z-10">
         {/* Desktop Sidebar */}
         <aside className="hidden lg:block w-80 h-screen sticky top-0 border-r border-border">
           <EnhancedSidebar />
@@ -516,13 +529,13 @@ const DocumentationContent = () => {
         )}
 
         {/* Main Content */}
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 relative">
           <div className="container mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
             {/* Content Header */}
             <div className="mb-8">
               <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-6">
                 <div className="flex items-start gap-4 flex-1">
-                  <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg shrink-0">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shrink-0">
                     <div className="text-white">
                       {(() => {
                         const section = sections.find(s => s.id === activeSection)
@@ -582,16 +595,12 @@ const DocumentationContent = () => {
                     
                     {/* Tags and Meta Info */}
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="secondary" className="text-xs">
+                      <Badge variant="secondary" className="text-xs bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
                         {currentNavIndex !== -1 ? `${currentNavIndex + 1} of ${orderedNavigation.length}` : '1 of 1'}
                       </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        <Clock className="w-3 h-3 mr-1" />
-                        15 min read
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        <Users className="w-3 h-3 mr-1" />
-                        Beginner
+                      <Badge variant="outline" className="text-xs hover:bg-blue-50 dark:hover:bg-blue-950/30">
+                        <FileText className="w-3 h-3 mr-1" />
+                        Documentation
                       </Badge>
                     </div>
                   </div>
@@ -600,7 +609,7 @@ const DocumentationContent = () => {
             </div>
 
             {/* Content */}
-            <div className="prose prose-base prose-neutral max-w-none dark:prose-invert">
+            <div className="prose prose-base prose-neutral max-w-none dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-code:text-foreground prose-pre:bg-muted dark:prose-pre:bg-muted/50">
               <MarkdownRenderer 
                 content={currentContent}
                 className="transition-all duration-200"
@@ -614,15 +623,15 @@ const DocumentationContent = () => {
                   <Button
                     variant="outline"
                     onClick={() => handleSectionChange(previousNav.id)}
-                    className="group justify-start h-auto p-4 text-left"
+                    className="group justify-start h-auto p-4 text-left bg-background hover:bg-blue-50 dark:bg-muted/10 dark:hover:bg-blue-950/30 hover:border-blue-200 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400 border-muted dark:border-muted/50 text-foreground dark:text-foreground"
                   >
                     <div className="flex items-start gap-3">
-                      <ChevronLeft className="w-5 h-5 mt-0.5 transition-transform group-hover:-translate-x-1" />
+                      <ChevronLeft className="w-5 h-5 mt-0.5 transition-transform group-hover:-translate-x-1 text-muted-foreground group-hover:text-blue-500 dark:group-hover:text-blue-400" />
                       <div>
-                        <div className="text-xs text-muted-foreground mb-1">
+                        <div className="text-xs text-muted-foreground mb-1 font-medium">
                           Previous {previousNav.type === 'submodule' ? 'Submodule' : 'Module'}
                         </div>
-                        <div className="font-medium">
+                        <div className="font-semibold text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400">
                           {previousNav.type === 'module' 
                             ? `${sections.findIndex(s => s.id === previousNav.id) + 1}. ${previousNav.title}`
                             : previousNav.title
@@ -637,21 +646,21 @@ const DocumentationContent = () => {
                   <Button
                     variant="outline"
                     onClick={() => handleSectionChange(nextNav.id)}
-                    className="group justify-end h-auto p-4 text-right sm:col-start-2"
+                    className="group justify-end h-auto p-4 text-right sm:col-start-2 bg-background hover:bg-blue-50 dark:bg-muted/10 dark:hover:bg-blue-950/30 hover:border-blue-200 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400 border-muted dark:border-muted/50 text-foreground dark:text-foreground"
                   >
                     <div className="flex items-start gap-3">
                       <div>
-                        <div className="text-xs text-muted-foreground mb-1">
+                        <div className="text-xs text-muted-foreground mb-1 font-medium">
                           Next {nextNav.type === 'submodule' ? 'Submodule' : 'Module'}
                         </div>
-                        <div className="font-medium">
+                        <div className="font-semibold text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400">
                           {nextNav.type === 'module' 
                             ? `${sections.findIndex(s => s.id === nextNav.id) + 1}. ${nextNav.title}`
                             : nextNav.title
                           }
                         </div>
                       </div>
-                      <ChevronRight className="w-5 h-5 mt-0.5 transition-transform group-hover:translate-x-1" />
+                      <ChevronRight className="w-5 h-5 mt-0.5 transition-transform group-hover:translate-x-1 text-muted-foreground group-hover:text-blue-500 dark:group-hover:text-blue-400" />
                     </div>
                   </Button>
                 )}

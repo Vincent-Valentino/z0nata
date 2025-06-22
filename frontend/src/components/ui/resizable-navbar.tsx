@@ -222,10 +222,7 @@ export const MobileNavToggle = ({
 
 export const NavbarLogo = ({ visible }: { visible?: boolean }) => {
   return (
-    <a
-      href="#"
-      className="relative z-20 flex items-center space-x-3 px-2 py-1"
-    >
+    <div className="relative z-20 flex items-center space-x-3 px-2 py-1">
       <div className="w-11 h-11 bg-gradient-to-br from-gray-900 via-gray-800 to-black rounded-2xl flex items-center justify-center shadow-lg border border-gray-700/50 hover:shadow-xl transition-all duration-200 ml-6">
         <span className="text-white font-bold text-xl font-roboto-condensed tracking-tight">Z</span>
       </div>
@@ -241,7 +238,7 @@ export const NavbarLogo = ({ visible }: { visible?: boolean }) => {
           </motion.span>
         )}
       </AnimatePresence>
-    </a>
+    </div>
   );
 };
 

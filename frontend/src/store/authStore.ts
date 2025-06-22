@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { api } from '@/lib/api'
 
 export interface User {
   id: string
@@ -181,40 +182,17 @@ export const getStudentUser = (): User => ({
 })
 
 // Development login functions that create real JWT tokens
-export const useLoginAsAdmin = () => {
-  return async () => {
-    return await loginAsAdminDirect()
-  }
-}
-
-export const useLoginAsStudent = () => {
-  return async () => {
-    return await loginAsStudentDirect()
-  }
-}
-
-// Direct login functions that don't use hooks (safe to call anywhere)
-export const loginAsAdminDirect = async () => {
-  const { login, logout } = useAuthStore.getState()
-  
+export const loginAsAdminDirect = async (): Promise<boolean> => {
   try {
-    console.log('🔗 Making request to development admin login endpoint...')
-    
-    // Clear any existing auth state first
-    await logout()
-    
-    // Use the development admin login endpoint that generates real JWT tokens
-    const loginResponse = await fetch('http://localhost:8080/api/v1/dev/login-admin', {
+    const response = await fetch('http://localhost:8080/api/v1/dev/login-admin', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
     })
-    
-    console.log('📡 Response received:', loginResponse.status, loginResponse.statusText)
 
-    if (loginResponse.ok) {
-      const data = await loginResponse.json()
+    if (response.ok) {
+      const data = await response.json()
       console.log('✅ Development admin login response:', data)
       
       // Validate the response has required fields
@@ -248,58 +226,30 @@ export const loginAsAdminDirect = async () => {
         },
       }
 
-      login(user, data.access_token, data.refresh_token)
-      console.log('✅ Admin login successful with real JWT token from dev endpoint')
-      
-      // Validate token immediately
-      setTimeout(async () => {
-        try {
-          const testResponse = await fetch('http://localhost:8080/api/v1/admin/questions/stats', {
-            headers: {
-              'Authorization': `Bearer ${data.access_token}`,
-              'Content-Type': 'application/json'
-            }
-          })
-          if (testResponse.ok) {
-            console.log('✅ Token validation successful')
-          } else {
-            console.warn('⚠️ Token validation failed:', testResponse.status)
-          }
-        } catch (error) {
-          console.warn('⚠️ Token validation error:', error)
-        }
-      }, 500)
-      
+      useAuthStore.getState().login(user, data.access_token, data.refresh_token)
       return true
     } else {
-      const errorText = await loginResponse.text()
-      console.error('❌ Development admin login failed:', loginResponse.status, errorText)
-      
-      // Don't fallback to mock - let user know they need to fix the backend
-      console.error('⚠️ Backend dev login failed - mock tokens won\'t work with API')
+      const errorText = await response.text()
+      console.error('❌ Development admin login failed:', response.status, errorText)
       return false
     }
   } catch (error) {
     console.error('❌ Admin login error:', error)
-    console.error('⚠️ Cannot login - mock tokens won\'t work with API')
     return false
   }
 }
 
-export const loginAsStudentDirect = async () => {
-  const { login } = useAuthStore.getState()
-  
+export const loginAsStudentDirect = async (): Promise<boolean> => {
   try {
-    // Use the development student login endpoint that generates real JWT tokens
-    const loginResponse = await fetch('http://localhost:8080/api/v1/dev/login-student', {
+    const response = await fetch('http://localhost:8080/api/v1/dev/login-student', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
     })
 
-    if (loginResponse.ok) {
-      const data = await loginResponse.json()
+    if (response.ok) {
+      const data = await response.json()
       console.log('✅ Development student login response:', data)
       
       // Map backend user data to frontend User interface
@@ -331,40 +281,30 @@ export const loginAsStudentDirect = async () => {
         },
       }
 
-      login(user, data.access_token, data.refresh_token)
-      console.log('✅ Student login successful with real JWT token from dev endpoint')
+      useAuthStore.getState().login(user, data.access_token, data.refresh_token)
       return true
     } else {
-      const errorText = await loginResponse.text()
+      const errorText = await response.text()
       console.error('Development student login failed:', errorText)
-      // Fallback to mock user with fake token
-      console.warn('Backend dev login failed, using mock student user')
-      const mockUser = getStudentUser()
-      login(mockUser, 'mock-student-token-' + Date.now())
       return false
     }
   } catch (error) {
     console.error('Student login error:', error)
-    // Fallback to mock user
-    const mockUser = getStudentUser()
-    login(mockUser, 'mock-student-token-' + Date.now())
     return false
   }
 }
 
-export const loginAsUserDirect = async () => {
-  const { login } = useAuthStore.getState()
-
+export const loginAsUserDirect = async (): Promise<boolean> => {
   try {
-    const loginResponse = await fetch('http://localhost:8080/api/v1/dev/login-user', {
+    const response = await fetch('http://localhost:8080/api/v1/dev/login-user', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
     })
 
-    if (loginResponse.ok) {
-      const data = await loginResponse.json()
+    if (response.ok) {
+      const data = await response.json()
       console.log('✅ Development user login response:', data)
 
       const user: User = {
@@ -382,11 +322,11 @@ export const loginAsUserDirect = async () => {
         permissions: ['read'],
       }
 
-      login(user, data.access_token, data.refresh_token)
+      useAuthStore.getState().login(user, data.access_token, data.refresh_token)
       return true
     }
 
-    const errorText = await loginResponse.text()
+    const errorText = await response.text()
     console.error('Development user login failed:', errorText)
     return false
   } catch (error) {
@@ -395,35 +335,106 @@ export const loginAsUserDirect = async () => {
   }
 }
 
-// Auto-login as admin on app start for development
-if (process.env.NODE_ENV === 'development') {
-  const currentState = useAuthStore.getState()
-  console.log('🔍 Current auth state:', { 
-    isAuthenticated: currentState.isAuthenticated, 
-    user: currentState.user?.full_name,
-    token: currentState.token ? 'Present' : 'Missing'
-  })
-  
-  if (!currentState.isAuthenticated) {
-    // Auto login as admin using the development endpoint with real JWT token
-    console.log('🚀 Starting development auto-login...')
-    setTimeout(async () => {
-      try {
-        console.log('🔄 Attempting auto-login as admin...')
-        const success = await loginAsAdminDirect()
-        if (success) {
-          console.log('✅ Development auto-login as admin successful with real JWT token')
-        } else {
-          console.warn('⚠️  Development auto-login failed, but fallback user was set')
+// OAuth login handler
+export const handleOAuthLogin = async (provider: string, userType: 'mahasiswa' | 'admin' | 'user' = 'user') => {
+  try {
+    console.log(`🔄 Starting ${provider} OAuth for ${userType}...`)
+    
+    // Get OAuth URL from backend
+    const response = await fetch(`http://localhost:8080/api/v1/auth/oauth/${provider}/url?user_type=${userType}`)
+    if (!response.ok) {
+      throw new Error(`Failed to get OAuth URL: ${response.statusText}`)
+    }
+    
+    const { url } = await response.json()
+    console.log(`🔗 OAuth URL obtained: ${url}`)
+    
+    // Open OAuth popup
+    const popup = window.open(
+      url,
+      'oauth-login',
+      'width=500,height=600,scrollbars=yes,resizable=yes'
+    )
+    
+    if (!popup) {
+      throw new Error('Failed to open OAuth popup. Please allow popups for this site.')
+    }
+    
+    // Listen for OAuth completion
+    return new Promise((resolve, reject) => {
+      const messageListener = async (event: MessageEvent) => {
+        // Verify origin for security
+        if (event.origin !== window.location.origin) {
+          return
         }
-      } catch (error) {
-        console.error('❌ Auto-login failed:', error)
+        
+        if (event.data.type === 'OAUTH_SUCCESS') {
+          console.log('✅ OAuth success received:', event.data)
+          
+          try {
+            // Map the OAuth user data to our User interface
+            const oauthUser = event.data.user
+            const user: User = {
+              id: oauthUser.id || oauthUser._id,
+              full_name: oauthUser.full_name || oauthUser.name,
+              email: oauthUser.email,
+              email_verified: oauthUser.email_verified || true,
+              profile_picture: oauthUser.profile_picture || oauthUser.picture,
+              last_login: new Date().toISOString(),
+              created_at: oauthUser.created_at || new Date().toISOString(),
+              updated_at: oauthUser.updated_at || new Date().toISOString(),
+              role: userType === 'admin' ? 'admin' : 'student',
+              user_type: userType,
+              is_admin: userType === 'admin',
+              permissions: userType === 'admin' ? ['read', 'write', 'delete', 'admin'] : ['read'],
+            }
+            
+            // Store tokens and user data
+            useAuthStore.getState().login(
+              user, 
+              event.data.access_token, 
+              event.data.refresh_token
+            )
+            
+            // Store tokens in localStorage for API calls
+            localStorage.setItem('access_token', event.data.access_token)
+            if (event.data.refresh_token) {
+              localStorage.setItem('refresh_token', event.data.refresh_token)
+            }
+            
+            popup.close()
+            window.removeEventListener('message', messageListener)
+            resolve(event.data)
+          } catch (error) {
+            console.error('❌ Error processing OAuth success:', error)
+            popup.close()
+            window.removeEventListener('message', messageListener)
+            reject(error)
+          }
+        } else if (event.data.type === 'OAUTH_ERROR') {
+          console.error('❌ OAuth error received:', event.data.error)
+          popup.close()
+          window.removeEventListener('message', messageListener)
+          reject(new Error(event.data.error))
+        }
       }
-    }, 500)
-  } else {
-    console.log('ℹ️  User already authenticated, skipping auto-login')
+      
+      window.addEventListener('message', messageListener)
+      
+      // Check if popup was closed manually
+      const checkClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkClosed)
+          window.removeEventListener('message', messageListener)
+          reject(new Error('OAuth popup was closed'))
+        }
+      }, 1000)
+    })
+  } catch (error) {
+    console.error(`❌ ${provider} OAuth failed:`, error)
+    throw error
   }
-} 
+}
 
 // Debug function for manual testing (available in browser console)
 export const debugAuth = {
@@ -454,253 +465,32 @@ export const debugAuth = {
       }, 1000)
     }, 100)
   },
-  
+
   getCurrentState() {
     const state = useAuthStore.getState()
-    console.log('🧪 Debug: Current auth state:', {
-      isAuthenticated: state.isAuthenticated,
-      user: state.user,
-      token: state.token ? `${state.token.slice(0, 20)}...` : 'null'
-    })
+    console.log('Current auth state:', state)
     return state
   },
-  
+
   async testAPICall() {
-    const token = useAuthStore.getState().token
+    const { token } = useAuthStore.getState()
     if (!token) {
-      console.error('🧪 Debug: No token available')
+      console.log('No token available')
       return
     }
     
     try {
-      const response = await fetch('http://localhost:8080/api/v1/admin/questions/stats', {
+      const response = await fetch('http://localhost:8080/api/v1/user/profile', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       })
-      console.log('🧪 Debug: API test result:', response.status, await response.json())
+      const data = await response.json()
+      console.log('API Test Result:', { status: response.status, data })
     } catch (error) {
-      console.error('🧪 Debug: API test failed:', error)
+      console.error('API Test Failed:', error)
     }
-  }
-}
-
-// OAuth login functions
-export const handleOAuthLogin = async (provider: string, userType: 'mahasiswa' | 'admin' | 'user' = 'user') => {
-  const { login } = useAuthStore.getState()
-  
-  try {
-    console.log(`🔗 Starting OAuth login with ${provider} as ${userType}...`)
-    
-    // Get OAuth URL from backend
-    const urlResponse = await fetch(`http://localhost:8080/api/v1/auth/oauth/${provider}/url?user_type=${userType}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-    
-    if (!urlResponse.ok) {
-      throw new Error(`Failed to get OAuth URL: ${urlResponse.statusText}`)
-    }
-    
-    const urlData = await urlResponse.json()
-    console.log('✅ OAuth URL received:', urlData.auth_url)
-    
-    // Open OAuth popup
-    const popup = window.open(
-      urlData.auth_url,
-      'oauth-login',
-      'width=500,height=600,scrollbars=yes,resizable=yes'
-    )
-    
-    if (!popup) {
-      throw new Error('Failed to open OAuth popup. Please allow popups for this site.')
-    }
-    
-    // Listen for OAuth callback
-    return new Promise<boolean>((resolve, reject) => {
-      const checkClosed = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(checkClosed)
-          reject(new Error('OAuth popup was closed by user'))
-        }
-      }, 1000)
-      
-      // Listen for message from popup
-      const messageListener = async (event: MessageEvent) => {
-        if (event.origin !== window.location.origin) return
-        
-        if (event.data.type === 'OAUTH_BACKEND_SUCCESS') {
-          // Backend callback - tokens are already available
-          clearInterval(checkClosed)
-          window.removeEventListener('message', messageListener)
-          popup.close()
-          
-          try {
-            console.log('✅ OAuth backend callback successful', event.data)
-            
-            // Get user profile from backend using the access token
-            const profileResponse = await fetch('http://localhost:8080/api/v1/user/profile', {
-              headers: {
-                'Authorization': `Bearer ${event.data.access_token}`,
-                'Content-Type': 'application/json'
-              }
-            })
-
-            if (profileResponse.ok) {
-              const profileData = await profileResponse.json()
-              console.log('✅ User profile fetched:', profileData)
-              
-              // Map backend user data to frontend User interface
-              const user: User = {
-                id: profileData.id || profileData._id,
-                full_name: profileData.full_name,
-                email: profileData.email,
-                email_verified: profileData.email_verified,
-                profile_picture: profileData.profile_picture,
-                last_login: profileData.last_login || new Date().toISOString(),
-                created_at: profileData.created_at || new Date().toISOString(),
-                updated_at: profileData.updated_at || new Date().toISOString(),
-                role: event.data.user_type === 'admin' ? 'admin' : 'student',
-                user_type: event.data.user_type,
-                nim: profileData.mahasiswa_id || profileData.nim,
-                faculty: profileData.faculty,
-                major: profileData.major,
-                is_admin: profileData.is_admin || event.data.user_type === 'admin',
-                permissions: profileData.permissions || (event.data.user_type === 'admin' ? ['read', 'write', 'delete', 'admin'] : ['read']),
-                preferences: {
-                  theme: 'light',
-                  language: 'en',
-                  notifications: true,
-                },
-                stats: {
-                  testsCompleted: 0,
-                  averageScore: 0,
-                  totalTimeSpent: 0,
-                  streak: 0,
-                },
-              }
-
-              login(user, event.data.access_token, event.data.refresh_token)
-              console.log('✅ OAuth backend login completed successfully')
-              resolve(true)
-            } else {
-              // Fallback to basic user data from OAuth callback
-              const user: User = {
-                id: 'oauth-user-' + Date.now(),
-                full_name: 'OAuth User',
-                email: 'oauth@example.com',
-                email_verified: true,
-                profile_picture: '',
-                last_login: new Date().toISOString(),
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                role: event.data.user_type === 'admin' ? 'admin' : 'student',
-                user_type: event.data.user_type,
-                is_admin: event.data.user_type === 'admin',
-                permissions: event.data.user_type === 'admin' ? ['read', 'write', 'delete', 'admin'] : ['read'],
-                preferences: {
-                  theme: 'light',
-                  language: 'en',
-                  notifications: true,
-                },
-                stats: {
-                  testsCompleted: 0,
-                  averageScore: 0,
-                  totalTimeSpent: 0,
-                  streak: 0,
-                },
-              }
-
-              login(user, event.data.access_token, event.data.refresh_token)
-              console.log('✅ OAuth backend login completed with fallback user data')
-              resolve(true)
-            }
-          } catch (error) {
-            console.error('❌ OAuth backend callback error:', error)
-            reject(error)
-          }
-        } else if (event.data.type === 'OAUTH_SUCCESS') {
-          // Frontend callback - process code
-          clearInterval(checkClosed)
-          window.removeEventListener('message', messageListener)
-          popup.close()
-          
-          try {
-            // Send OAuth data to backend
-            const loginResponse = await fetch('http://localhost:8080/api/v1/auth/oauth/callback', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                provider: provider,
-                code: event.data.code,
-                user_type: userType,
-              }),
-            })
-            
-            if (loginResponse.ok) {
-              const data = await loginResponse.json()
-              console.log('✅ OAuth frontend callback successful:', data)
-              
-              // Map backend user data to frontend User interface
-              const user: User = {
-                id: data.user.id || data.user._id,
-                full_name: data.user.full_name,
-                email: data.user.email,
-                email_verified: data.user.email_verified,
-                profile_picture: data.user.profile_picture,
-                last_login: data.user.last_login || new Date().toISOString(),
-                created_at: data.user.created_at || new Date().toISOString(),
-                updated_at: data.user.updated_at || new Date().toISOString(),
-                role: userType === 'admin' ? 'admin' : 'student',
-                user_type: userType,
-                is_admin: data.user.is_admin || userType === 'admin',
-                permissions: data.user.permissions || (userType === 'admin' ? ['read', 'write', 'delete', 'admin'] : ['read']),
-                nim: data.user.nim || data.user.mahasiswa_id,
-                faculty: data.user.faculty,
-                major: data.user.major,
-                preferences: {
-                  theme: 'light',
-                  language: 'en',
-                  notifications: true,
-                },
-                stats: {
-                  testsCompleted: 0,
-                  averageScore: 0,
-                  totalTimeSpent: 0,
-                  streak: 0,
-                },
-              }
-
-              login(user, data.access_token, data.refresh_token)
-              console.log('✅ OAuth frontend login completed successfully')
-              resolve(true)
-            } else {
-              const errorText = await loginResponse.text()
-              console.error('❌ OAuth frontend login failed:', errorText)
-              reject(new Error(`OAuth login failed: ${errorText}`))
-            }
-          } catch (error) {
-            console.error('❌ OAuth frontend callback error:', error)
-            reject(error)
-          }
-        } else if (event.data.type === 'OAUTH_ERROR') {
-          clearInterval(checkClosed)
-          window.removeEventListener('message', messageListener)
-          popup.close()
-          reject(new Error(event.data.error || 'OAuth login failed'))
-        }
-      }
-      
-      window.addEventListener('message', messageListener)
-    })
-  } catch (error) {
-    console.error('❌ OAuth login error:', error)
-    throw error
   }
 }
 
@@ -708,4 +498,5 @@ export const handleOAuthLogin = async (provider: string, userType: 'mahasiswa' |
 if (process.env.NODE_ENV === 'development') {
   ;(window as any).debugAuth = debugAuth
   ;(window as any).handleOAuthLogin = handleOAuthLogin
-} 
+}
+ 

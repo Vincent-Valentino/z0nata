@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
+import { QuizResultsDisplay } from '@/components/quiz/QuizResultsDisplay'
 import { 
   Trophy, 
   TrendingUp, 
@@ -21,15 +23,20 @@ import {
 } from 'lucide-react'
 import { userActivityService } from '@/services/userActivityService'
 import type { QuizResult, UserStats, Achievement, QuizType } from '@/types/userActivity'
+import type { DetailedQuizResult } from '@/types/quiz'
 
 export const ResultsPage = () => {
   const { user } = useAuthStore()
+  const location = useLocation()
   const [selectedQuizType, setSelectedQuizType] = useState<'all' | QuizType>('all')
   const [quizResults, setQuizResults] = useState<QuizResult[]>([])
   const [userStats, setUserStats] = useState<UserStats | null>(null)
   const [achievements, setAchievements] = useState<Achievement[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Check if we have a detailed quiz result from navigation
+  const detailedResult = location.state?.result as DetailedQuizResult | undefined
 
   // Load user results data
   useEffect(() => {
@@ -56,6 +63,11 @@ export const ResultsPage = () => {
 
     loadData()
   }, [user, selectedQuizType])
+
+  // If we have a detailed result from quiz completion, show that instead
+  if (detailedResult) {
+    return <QuizResultsDisplay result={detailedResult} />
+  }
 
   if (!user) {
     return (
