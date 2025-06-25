@@ -296,10 +296,6 @@ func (s *questionService) validateMultipleChoiceQuestion(req *models.CreateQuest
 	if len(req.CorrectAnswers) < 1 {
 		return errors.New("multiple choice questions must have at least 1 correct answer")
 	}
-	if len(req.CorrectAnswers) >= len(req.Options) {
-		return errors.New("multiple choice questions cannot have all options as correct")
-	}
-
 	return nil
 }
 
