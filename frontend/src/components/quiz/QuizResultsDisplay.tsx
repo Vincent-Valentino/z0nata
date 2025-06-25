@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -19,7 +19,11 @@ import {
   RotateCcw,
   Home,
   Share2,
-  Download
+  Download,
+  ChevronDown,
+  ChevronUp,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import type { DetailedQuizResult, QuestionResult } from '@/types/quiz'
 
@@ -35,6 +39,33 @@ export const QuizResultsDisplay: React.FC<QuizResultsDisplayProps> = ({
   onHome
 }) => {
   const navigate = useNavigate()
+  
+  // State for expandable sections
+  const [showWrongAnswers, setShowWrongAnswers] = useState(false)
+  const [showSkippedQuestions, setShowSkippedQuestions] = useState(false)
+  const [showCorrectAnswers, setShowCorrectAnswers] = useState(false)
+  
+  // Pagination state
+  const [wrongAnswersPage, setWrongAnswersPage] = useState(1)
+  const [skippedQuestionsPage, setSkippedQuestionsPage] = useState(1)
+  const [correctAnswersPage, setCorrectAnswersPage] = useState(1)
+  
+  const ITEMS_PER_PAGE = 3
+
+  // Helper function to convert option IDs to text
+  const getOptionText = (optionIds: string | string[], options: any[]): string => {
+    if (!options || options.length === 0) return 'N/A'
+    
+    if (Array.isArray(optionIds)) {
+      return optionIds.map(id => {
+        const option = options.find(opt => opt.id === id)
+        return option ? option.text : id
+      }).join(', ')
+    } else {
+      const option = options.find(opt => opt.id === optionIds)
+      return option ? option.text : optionIds
+    }
+  }
 
   const formatTime = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60)
@@ -98,6 +129,55 @@ export const QuizResultsDisplay: React.FC<QuizResultsDisplayProps> = ({
   const performance = getPerformanceMessage()
   const wrongAnswers = result.question_results.filter(q => !q.is_correct && !q.is_skipped)
   const skippedQuestions = result.question_results.filter(q => q.is_skipped)
+  const correctAnswers = result.question_results.filter(q => q.is_correct)
+
+  // Pagination helpers
+  const getPaginatedItems = (items: QuestionResult[], page: number) => {
+    const startIndex = (page - 1) * ITEMS_PER_PAGE
+    const endIndex = startIndex + ITEMS_PER_PAGE
+    return items.slice(startIndex, endIndex)
+  }
+
+  const getTotalPages = (itemsLength: number) => Math.ceil(itemsLength / ITEMS_PER_PAGE)
+
+  const renderPaginationControls = (
+    currentPage: number,
+    totalItems: number,
+    onPageChange: (page: number) => void
+  ) => {
+    const totalPages = getTotalPages(totalItems)
+    if (totalPages <= 1) return null
+
+    return (
+      <div className="flex items-center justify-between pt-4 border-t">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+          disabled={currentPage === 1}
+          className="flex items-center gap-1"
+        >
+          <ChevronLeft className="w-3 h-3" />
+          Previous
+        </Button>
+        
+        <span className="text-sm text-gray-600">
+          Page {currentPage} of {totalPages} ({totalItems} total)
+        </span>
+        
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+          disabled={currentPage === totalPages}
+          className="flex items-center gap-1"
+        >
+          Next
+          <ChevronRight className="w-3 h-3" />
+        </Button>
+      </div>
+    )
+  }
 
   const difficultyStats = [
     {
@@ -293,120 +373,222 @@ export const QuizResultsDisplay: React.FC<QuizResultsDisplayProps> = ({
           {/* Question Review Column */}
           <div className="lg:col-span-2 space-y-6">
             
+            {/* Quick Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Target className="w-5 h-5" />
+                  Question Review Summary
+                </CardTitle>
+                <CardDescription>
+                  Quick overview of your performance by category
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {wrongAnswers.length > 0 && (
+                    <div className="text-center p-4 bg-red-50 rounded-lg border border-red-200">
+                      <XCircle className="w-6 h-6 text-red-500 mx-auto mb-2" />
+                      <div className="font-bold text-red-700">{wrongAnswers.length}</div>
+                      <div className="text-sm text-red-600">Incorrect</div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 text-red-600 border-red-300"
+                        onClick={() => setShowWrongAnswers(true)}
+                      >
+                        Review
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {skippedQuestions.length > 0 && (
+                    <div className="text-center p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <SkipForward className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
+                      <div className="font-bold text-yellow-700">{skippedQuestions.length}</div>
+                      <div className="text-sm text-yellow-600">Skipped</div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 text-yellow-600 border-yellow-300"
+                        onClick={() => setShowSkippedQuestions(true)}
+                      >
+                        View
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {correctAnswers.length > 0 && (
+                    <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
+                      <CheckCircle2 className="w-6 h-6 text-green-500 mx-auto mb-2" />
+                      <div className="font-bold text-green-700">{correctAnswers.length}</div>
+                      <div className="text-sm text-green-600">Correct</div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 text-green-600 border-green-300"
+                        onClick={() => setShowCorrectAnswers(true)}
+                      >
+                        Details
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+            
             {/* Wrong Answers */}
             {wrongAnswers.length > 0 && (
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <XCircle className="w-5 h-5 text-red-500" />
-                    Review Incorrect Answers ({wrongAnswers.length})
+                <CardHeader className="cursor-pointer" onClick={() => setShowWrongAnswers(!showWrongAnswers)}>
+                  <CardTitle className="text-lg flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <XCircle className="w-5 h-5 text-red-500" />
+                      Review Incorrect Answers ({wrongAnswers.length})
+                    </div>
+                    {showWrongAnswers ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                   </CardTitle>
                   <CardDescription>
-                    Focus on these questions to improve your understanding
+                    {showWrongAnswers 
+                      ? 'Focus on these questions to improve your understanding' 
+                      : 'Click to expand and review your incorrect answers'
+                    }
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {wrongAnswers.map((question, index) => (
-                    <div key={question.question_id} className="border border-red-200 rounded-lg p-4 bg-red-50">
-                      <div className="flex items-start gap-3 mb-3">
-                        <Badge variant="destructive" className="mt-1">
-                          {question.difficulty}
-                        </Badge>
-                        <div className="flex-1">
-                          <h4 className="font-medium text-gray-900 mb-2">{question.title}</h4>
-                          <div className="space-y-2">
-                            <div className="text-sm">
-                              <span className="text-red-700 font-medium">Your answer: </span>
-                              <span className="text-red-600">
-                                {Array.isArray(question.user_answer) 
-                                  ? question.user_answer.join(', ') 
-                                  : question.user_answer}
-                              </span>
-                            </div>
-                            <div className="text-sm">
-                              <span className="text-green-700 font-medium">Correct answer: </span>
-                              <span className="text-green-600">
-                                {Array.isArray(question.correct_answer) 
-                                  ? question.correct_answer.join(', ') 
-                                  : question.correct_answer}
-                              </span>
+                
+                {showWrongAnswers && (
+                  <CardContent className="space-y-4 animate-expand">
+                    {getPaginatedItems(wrongAnswers, wrongAnswersPage).map((question, index) => (
+                      <div key={question.question_id} className="border border-red-200 rounded-lg p-4 bg-red-50">
+                        <div className="flex items-start gap-3 mb-3">
+                          <Badge variant="destructive" className="mt-1">
+                            {question.difficulty}
+                          </Badge>
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 mb-2">{question.title}</h4>
+                            <div className="space-y-2">
+                              <div className="text-sm">
+                                <span className="text-red-700 font-medium">Your answer: </span>
+                                <span className="text-red-600">
+                                  {question.user_answer ? getOptionText(question.user_answer, question.options) : 'No answer'}
+                                </span>
+                              </div>
+                              <div className="text-sm">
+                                <span className="text-green-700 font-medium">Correct answer: </span>
+                                <span className="text-green-600">
+                                  {getOptionText(question.correct_answer, question.options)}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="text-right text-sm text-gray-500">
-                          {question.points} pts
+                          <div className="text-right text-sm text-gray-500">
+                            {question.points} pts
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </CardContent>
+                    ))}
+                    
+                    {renderPaginationControls(wrongAnswersPage, wrongAnswers.length, setWrongAnswersPage)}
+                  </CardContent>
+                )}
               </Card>
             )}
 
             {/* Skipped Questions */}
             {skippedQuestions.length > 0 && (
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <SkipForward className="w-5 h-5 text-yellow-500" />
-                    Skipped Questions ({skippedQuestions.length})
+                <CardHeader className="cursor-pointer" onClick={() => setShowSkippedQuestions(!showSkippedQuestions)}>
+                  <CardTitle className="text-lg flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <SkipForward className="w-5 h-5 text-yellow-500" />
+                      Skipped Questions ({skippedQuestions.length})
+                    </div>
+                    {showSkippedQuestions ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                   </CardTitle>
                   <CardDescription>
-                    Questions you skipped during the quiz
+                    {showSkippedQuestions 
+                      ? 'Questions you skipped during the quiz' 
+                      : 'Click to expand and see the answers to skipped questions'
+                    }
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {skippedQuestions.map((question, index) => (
-                    <div key={question.question_id} className="border border-yellow-200 rounded-lg p-4 bg-yellow-50">
-                      <div className="flex items-start gap-3">
-                        <Badge variant="secondary" className="mt-1">
-                          {question.difficulty}
-                        </Badge>
-                        <div className="flex-1">
-                          <h4 className="font-medium text-gray-900 mb-2">{question.title}</h4>
-                          <div className="text-sm">
-                            <span className="text-green-700 font-medium">Correct answer: </span>
-                            <span className="text-green-600">
-                              {Array.isArray(question.correct_answer) 
-                                ? question.correct_answer.join(', ') 
-                                : question.correct_answer}
-                            </span>
+                
+                {showSkippedQuestions && (
+                  <CardContent className="space-y-4 animate-expand">
+                    {getPaginatedItems(skippedQuestions, skippedQuestionsPage).map((question, index) => (
+                      <div key={question.question_id} className="border border-yellow-200 rounded-lg p-4 bg-yellow-50">
+                        <div className="flex items-start gap-3">
+                          <Badge variant="secondary" className="mt-1">
+                            {question.difficulty}
+                          </Badge>
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 mb-2">{question.title}</h4>
+                            <div className="text-sm">
+                              <span className="text-green-700 font-medium">Correct answer: </span>
+                              <span className="text-green-600">
+                                {getOptionText(question.correct_answer, question.options)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right text-sm text-gray-500">
+                            {question.points} pts
                           </div>
                         </div>
-                        <div className="text-right text-sm text-gray-500">
-                          {question.points} pts
-                        </div>
                       </div>
-                    </div>
-                  ))}
-                </CardContent>
+                    ))}
+                    
+                    {renderPaginationControls(skippedQuestionsPage, skippedQuestions.length, setSkippedQuestionsPage)}
+                  </CardContent>
+                )}
               </Card>
             )}
 
             {/* Correct Answers Summary */}
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-green-500" />
-                  Correct Answers ({result.correct_answers})
+              <CardHeader className="cursor-pointer" onClick={() => setShowCorrectAnswers(!showCorrectAnswers)}>
+                <CardTitle className="text-lg flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    Correct Answers ({result.correct_answers})
+                  </div>
+                  {showCorrectAnswers ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                 </CardTitle>
                 <CardDescription>
-                  Well done on these questions!
+                  {showCorrectAnswers 
+                    ? 'Well done on these questions!' 
+                    : 'Click to expand and review your correct answers'
+                  }
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {result.question_results
-                    .filter(q => q.is_correct)
-                    .map((question, index) => (
-                      <div key={question.question_id} className="flex items-center gap-2 p-2 bg-green-50 rounded">
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
-                        <span className="text-sm font-medium">{question.difficulty}</span>
-                        <span className="text-sm text-gray-600">+{question.points_earned} pts</span>
+              
+              {showCorrectAnswers && (
+                <CardContent className="space-y-4 animate-expand">
+                  {getPaginatedItems(correctAnswers, correctAnswersPage).map((question, index) => (
+                    <div key={question.question_id} className="border border-green-200 rounded-lg p-4 bg-green-50">
+                      <div className="flex items-start gap-3">
+                        <Badge variant="default" className="mt-1 bg-green-100 text-green-800">
+                          {question.difficulty}
+                        </Badge>
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900 mb-2">{question.title}</h4>
+                          <div className="text-sm">
+                            <span className="text-green-700 font-medium">Your answer: </span>
+                            <span className="text-green-600">
+                              {getOptionText(question.correct_answer, question.options)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm text-gray-500">{question.points} pts</div>
+                          <CheckCircle2 className="w-4 h-4 text-green-500 mt-1" />
+                        </div>
                       </div>
-                    ))}
-                </div>
-              </CardContent>
+                    </div>
+                  ))}
+                  
+                  {renderPaginationControls(correctAnswersPage, correctAnswers.length, setCorrectAnswersPage)}
+                </CardContent>
+              )}
             </Card>
           </div>
         </div>

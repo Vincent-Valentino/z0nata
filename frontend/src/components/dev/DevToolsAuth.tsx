@@ -128,6 +128,18 @@ export const DevToolsAuth: React.FC = () => {
 
       if (success) {
         console.log(`✅ ${userType} login successful`)
+        
+        // Debug: Check the auth state after login
+        setTimeout(() => {
+          const authState = useAuthStore.getState()
+          console.log('🔍 Auth state after login:', {
+            isAuthenticated: authState.isAuthenticated,
+            hasUser: !!authState.user,
+            hasToken: !!authState.token,
+            userEmail: authState.user?.email,
+            tokenLength: authState.token?.length || 0
+          })
+        }, 100)
       } else {
         console.log(`❌ ${userType} login failed`)
       }
@@ -206,12 +218,12 @@ export const DevToolsAuth: React.FC = () => {
                 
                 {showTokenDetails && (
                   <div className="p-2 bg-muted rounded text-xs font-mono break-all">
-                    {localStorage.getItem('access_token') || 'No token found'}
+                    {useAuthStore.getState().token || localStorage.getItem('access_token') || 'No token found'}
                     <Button
                       size="sm"
                       variant="ghost"
                       className="ml-2"
-                      onClick={() => copyToClipboard(localStorage.getItem('access_token') || '')}
+                      onClick={() => copyToClipboard(useAuthStore.getState().token || localStorage.getItem('access_token') || '')}
                     >
                       {copiedToken ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                     </Button>

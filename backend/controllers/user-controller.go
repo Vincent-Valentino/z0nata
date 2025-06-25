@@ -213,7 +213,7 @@ func (uc *UserController) RefreshToken(c *gin.Context) {
 // @Router /auth/logout [post]
 func (uc *UserController) Logout(c *gin.Context) {
 	// Get user ID from context (set by auth middleware)
-	userID, exists := c.Get("user_id")
+	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error":   "Unauthorized",

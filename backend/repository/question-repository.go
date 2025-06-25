@@ -22,6 +22,7 @@ type QuestionRepository interface {
 	GetByType(ctx context.Context, questionType models.QuestionType, limit int) ([]*models.Question, error)
 	GetStats(ctx context.Context) (*models.QuestionStatsResponse, error)
 	GetRandomQuestions(ctx context.Context, questionType models.QuestionType, limit int) ([]*models.Question, error)
+	GetRandomQuestionsByDifficulty(ctx context.Context, difficulty models.DifficultyLevel, limit int) ([]*models.Question, error)
 }
 
 type questionRepository struct {
@@ -178,6 +179,35 @@ func (r *questionRepository) GetRandomQuestions(ctx context.Context, questionTyp
 	filter := bson.M{
 		"type":      questionType,
 		"is_active": true,
+	}
+
+	pipeline := []bson.M{
+		{"$match": filter},
+		{"$sample": bson.M{"size": limit}},
+	}
+
+	cursor, err := r.collection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var questions []*models.Question
+	for cursor.Next(ctx) {
+		var question models.Question
+		if err := cursor.Decode(&question); err != nil {
+			return nil, err
+		}
+		questions = append(questions, &question)
+	}
+
+	return questions, nil
+}
+
+func (r *questionRepository) GetRandomQuestionsByDifficulty(ctx context.Context, difficulty models.DifficultyLevel, limit int) ([]*models.Question, error) {
+	filter := bson.M{
+		"difficulty": difficulty,
+		"is_active":  true,
 	}
 
 	pipeline := []bson.M{

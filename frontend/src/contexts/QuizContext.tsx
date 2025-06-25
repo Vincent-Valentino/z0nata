@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useReducer, useEffect, useCallback, ReactNode } from 'react'
+import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import type { 
   QuizState, 
@@ -298,39 +299,71 @@ export const QuizProvider: React.FC<QuizProviderProps> = ({ children }) => {
 
   // Start Quiz
   const startQuiz = useCallback(async (quizType: QuizType) => {
+    console.log(`🎯 Starting ${quizType} quiz...`)
+    
+    dispatch({ type: 'SET_LOADING', payload: true })
+    dispatch({ type: 'SET_ERROR', payload: null })
+
     try {
-      dispatch({ type: 'SET_LOADING', payload: true })
-      dispatch({ type: 'SET_ERROR', payload: null })
-
+      // Clear any existing session data
+      quizStorage.clearAllQuizData()
+      
+      console.log('📡 Calling quiz service to start quiz...')
       const response = await quizService.startQuiz(quizType)
-      const session = response.session
-
-      // Store in localStorage
-      quizStorage.setSessionToken(response.resume_token)
-      quizStorage.setQuizType(quizType)
-      quizStorage.setSessionData(session)
-      quizStorage.setTimerStart(session.start_time)
-
-      // Update state
-      dispatch({ type: 'SET_SESSION', payload: session })
-      dispatch({ type: 'SET_TIME_REMAINING', payload: session.time_remaining })
-      dispatch({ type: 'SET_QUESTION_START_TIME', payload: Date.now() })
-
-      // Restore any existing answers
-      const storedAnswers = quizStorage.getAnswers()
-      storedAnswers.forEach((answer, index) => {
-        dispatch({ type: 'SET_ANSWER', payload: { questionIndex: index, answer } })
+      console.log('✅ Quiz start response received:', {
+        sessionId: response.session.id,
+        questionCount: response.session.questions.length,
+        timeLimit: response.session.time_limit_minutes,
+        message: response.message
       })
 
+      // Store session data
+      quizStorage.setSessionToken(response.session.session_token)
+      quizStorage.setQuizType(quizType)
+      quizStorage.setSessionData(response.session)
+      quizStorage.setTimerStart(response.session.start_time)
+
+      // Initialize state
+      dispatch({ type: 'SET_SESSION', payload: response.session })
+      dispatch({ type: 'SET_TIME_REMAINING', payload: response.session.time_remaining })
+      dispatch({ type: 'SET_QUESTION_START_TIME', payload: Date.now() })
+      
       // Start timer
       startTimer()
-
+      
+      console.log(`✅ ${quizType} quiz started successfully!`)
+      console.log(`📊 Quiz details: ${response.session.total_questions} questions, ${response.session.time_limit_minutes} minutes`)
+      
       toast.success(response.message)
+      
     } catch (error: any) {
-      console.error('Failed to start quiz:', error)
-      const errorMessage = error?.response?.data?.details || error?.response?.data?.error || 'Failed to start quiz'
+      console.error('❌ Failed to start quiz:', error)
+      
+      // Provide user-friendly error messages
+      let errorMessage = 'Failed to start quiz. Please try again.'
+      
+      if (error?.response?.status === 401) {
+        errorMessage = 'Your session has expired. Please log in again.'
+      } else if (error?.response?.status === 500) {
+        errorMessage = 'Server error. The quiz system might be temporarily unavailable.'
+      } else if (error?.response?.data?.error) {
+        errorMessage = error.response.data.error
+      } else if (error?.message) {
+        errorMessage = error.message
+      }
+      
       dispatch({ type: 'SET_ERROR', payload: errorMessage })
       toast.error(errorMessage)
+      
+      // Log detailed error for debugging
+      console.error('Detailed error info:', {
+        status: error?.response?.status,
+        statusText: error?.response?.statusText,
+        data: error?.response?.data,
+        message: error?.message,
+        stack: error?.stack
+      })
+      
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false })
     }

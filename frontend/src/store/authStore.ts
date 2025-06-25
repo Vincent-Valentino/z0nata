@@ -227,6 +227,12 @@ export const loginAsAdminDirect = async (): Promise<boolean> => {
       }
 
       useAuthStore.getState().login(user, data.access_token, data.refresh_token)
+      
+      // Verify the token was stored correctly
+      const storedToken = useAuthStore.getState().token
+      console.log('✅ Admin token stored successfully:', !!storedToken)
+      console.log('Admin token preview:', storedToken ? storedToken.substring(0, 20) + '...' : 'None')
+      
       return true
     } else {
       const errorText = await response.text()
@@ -282,6 +288,12 @@ export const loginAsStudentDirect = async (): Promise<boolean> => {
       }
 
       useAuthStore.getState().login(user, data.access_token, data.refresh_token)
+      
+      // Verify the token was stored correctly
+      const storedToken = useAuthStore.getState().token
+      console.log('✅ Student token stored successfully:', !!storedToken)
+      console.log('Student token preview:', storedToken ? storedToken.substring(0, 20) + '...' : 'None')
+      
       return true
     } else {
       const errorText = await response.text()
@@ -323,6 +335,12 @@ export const loginAsUserDirect = async (): Promise<boolean> => {
       }
 
       useAuthStore.getState().login(user, data.access_token, data.refresh_token)
+      
+      // Verify the token was stored correctly
+      const storedToken = useAuthStore.getState().token
+      console.log('✅ User token stored successfully:', !!storedToken)
+      console.log('User token preview:', storedToken ? storedToken.substring(0, 20) + '...' : 'None')
+      
       return true
     }
 

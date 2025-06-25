@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuiz } from '@/contexts/QuizContext'
+import { useAuthStore } from '@/store/authStore'
 import {
   TimeQuizHeader,
   TimeQuizWelcome,
@@ -16,6 +17,7 @@ import {
 
 const TimeQuizPage: React.FC = () => {
   const navigate = useNavigate()
+  const { isAuthenticated } = useAuthStore()
   const { 
     state, 
     startQuiz, 
@@ -37,8 +39,19 @@ const TimeQuizPage: React.FC = () => {
   const [lastFeedback, setLastFeedback] = useState<SaveAnswerResponse | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
 
+  // Check authentication and redirect if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      console.log('🔒 User not authenticated, redirecting to login page...')
+      navigate('/login', { replace: true })
+      return
+    }
+  }, [isAuthenticated, navigate])
+
   // Initialize quiz on page load
   useEffect(() => {
+    if (!isAuthenticated) return // Don't initialize if not authenticated
+    
     const initializeQuiz = async () => {
       if (!isInitialized) {
         setIsInitialized(true)
@@ -52,7 +65,7 @@ const TimeQuizPage: React.FC = () => {
     }
 
     initializeQuiz()
-  }, [isInitialized, checkForActiveSession, resumeQuiz])
+  }, [isAuthenticated, isInitialized, checkForActiveSession, resumeQuiz])
 
   // Update selected answer when question changes
   useEffect(() => {

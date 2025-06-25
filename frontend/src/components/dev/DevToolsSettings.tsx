@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
+import { Switch } from '@/components/ui'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Settings, Zap, Code, Info, RefreshCw, CheckCircle2 } from 'lucide-react'
+import { Settings, Zap, Code, Info, CheckCircle2 }  from 'lucide-react'
 
 interface DevSettings {
   debugMode: boolean
@@ -139,7 +139,7 @@ export const DevToolsSettings: React.FC = () => {
             </div>
             <Switch
               checked={settings.debugMode}
-              onCheckedChange={(checked) => updateSetting('debugMode', checked)}
+              onCheckedChange={(checked: boolean) => updateSetting('debugMode', checked)}
             />
           </div>
 
@@ -150,7 +150,7 @@ export const DevToolsSettings: React.FC = () => {
             </div>
             <Switch
               checked={settings.verboseLogging}
-              onCheckedChange={(checked) => updateSetting('verboseLogging', checked)}
+              onCheckedChange={(checked: boolean) => updateSetting('verboseLogging', checked)}
             />
           </div>
 
@@ -161,7 +161,7 @@ export const DevToolsSettings: React.FC = () => {
             </div>
             <Switch
               checked={settings.showDevPanel}
-              onCheckedChange={(checked) => updateSetting('showDevPanel', checked)}
+              onCheckedChange={(checked: boolean) => updateSetting('showDevPanel', checked)}
             />
           </div>
         </CardContent>
@@ -184,7 +184,7 @@ export const DevToolsSettings: React.FC = () => {
             </div>
             <Switch
               checked={settings.autoRefresh}
-              onCheckedChange={(checked) => updateSetting('autoRefresh', checked)}
+              onCheckedChange={(checked: boolean) => updateSetting('autoRefresh', checked)}
             />
           </div>
 
@@ -251,7 +251,7 @@ export const DevToolsSettings: React.FC = () => {
             </div>
             <Switch
               checked={settings.mockMode}
-              onCheckedChange={(checked) => updateSetting('mockMode', checked)}
+              onCheckedChange={(checked: boolean) => updateSetting('mockMode', checked)}
             />
           </div>
         </CardContent>

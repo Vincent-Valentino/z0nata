@@ -66,17 +66,24 @@ export const TimeQuizQuestionCard: React.FC<TimeQuizQuestionCardProps> = ({
                 onClick={() => !feedbackVisible && onAnswerSelect(option.id)}
                 variant={isSelected ? "default" : "outline"}
                 disabled={feedbackVisible || isExpired}
-                className={`w-full text-left justify-start h-auto py-3 px-4 ${
-                  showFeedback && isCorrect ? 'bg-green-100 border-green-300' :
-                  showFeedback && isSelected && !isCorrect ? 'bg-red-100 border-red-300' :
+                className={`w-full text-left justify-start h-auto py-3 px-4 transition-all duration-300 ${
+                  showFeedback && isCorrect ? 'bg-green-100 border-green-300 hover:bg-green-100' :
+                  showFeedback && isSelected && !isCorrect ? 'bg-red-100 border-red-300 hover:bg-red-100' :
+                  !feedbackVisible && !isExpired ? 'hover:bg-blue-50 hover:border-blue-300 hover:shadow-md' :
                   ''
+                } ${
+                  feedbackVisible || isExpired ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
                 }`}
               >
                 <div className="flex items-center gap-3 w-full">
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                    isSelected ? 'bg-blue-500 border-blue-500' : 'border-gray-300'
+                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
+                    isSelected ? 'bg-blue-500 border-blue-500 shadow-sm' : 'border-gray-300 hover:border-blue-400'
+                  } ${
+                    showFeedback && isCorrect ? 'bg-green-500 border-green-500' :
+                    showFeedback && isSelected && !isCorrect ? 'bg-red-500 border-red-500' :
+                    ''
                   }`}>
-                    {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+                    {isSelected && <div className="w-2 h-2 bg-white rounded-full animate-scale-in" />}
                   </div>
                   <span className="flex-1">{option.text}</span>
                   {showFeedback && isCorrect && (

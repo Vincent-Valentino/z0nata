@@ -64,7 +64,7 @@ func LoadConfig() models.Config {
 		},
 		JWT: models.JWTConfig{
 			SecretKey:            getEnvRequiredWithFallback("JWT_SECRET", "JWT_SECRET_KEY"),
-			AccessTokenDuration:  getEnvDurationWithFallback("JWT_ACCESS_TOKEN_EXPIRY", "JWT_ACCESS_DURATION", 15*time.Minute),
+			AccessTokenDuration:  getEnvDurationWithFallback("JWT_ACCESS_TOKEN_EXPIRY", "JWT_ACCESS_DURATION", 2*time.Hour), // Extended to 2 hours for development
 			RefreshTokenDuration: getEnvDurationWithFallback("JWT_REFRESH_TOKEN_EXPIRY", "JWT_REFRESH_DURATION", 168*time.Hour),
 			RememberMeDuration:   getEnvDurationWithFallback("JWT_REFRESH_TOKEN_EXPIRY", "JWT_REMEMBER_DURATION", 168*time.Hour),
 		},

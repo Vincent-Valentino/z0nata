@@ -18,13 +18,13 @@ class QuizService {
   async startQuiz(quizType: QuizType): Promise<StartQuizResponse> {
     const request: StartQuizRequest = { quiz_type: quizType }
     const response = await api.post<StartQuizResponse>('/quiz/start', request)
-    return response.data
+    return response
   }
 
   // Get current session details
   async getSession(sessionToken: string): Promise<GetSessionResponse> {
     const response = await api.get<GetSessionResponse>(`/quiz/session/${sessionToken}`)
-    return response.data
+    return response
   }
 
   // Save an answer for a question
@@ -43,7 +43,7 @@ class QuizService {
       `/quiz/session/${sessionToken}/answer`, 
       request
     )
-    return response.data
+    return response
   }
 
   // Navigate to a specific question
@@ -57,13 +57,13 @@ class QuizService {
     const response = await api.post<SubmitQuizResponse>(
       `/quiz/session/${sessionToken}/submit`
     )
-    return response.data
+    return response
   }
 
   // Check for resumable session
   async checkResumeSession(quizType: QuizType): Promise<ResumeSessionResponse> {
     const response = await api.get<ResumeSessionResponse>(`/quiz/resume/${quizType}`)
-    return response.data
+    return response
   }
 
   // Get user's quiz results history
@@ -75,7 +75,7 @@ class QuizService {
     const response = await api.get<{ results: DetailedQuizResult[]; count: number }>(
       `/quiz/results?${params.toString()}`
     )
-    return response.data.results
+    return response.results
   }
 
   // Utility methods for error handling

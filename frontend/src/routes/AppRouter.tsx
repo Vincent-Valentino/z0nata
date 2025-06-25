@@ -26,6 +26,7 @@ export const AppRouter = () => {
         
         {/* Auth Routes */}
         <Route path="/login" element={<AuthPage />} />
+        <Route path="/auth" element={<AuthPage />} />
         <Route path="/oauth-callback" element={<OAuthCallbackPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         

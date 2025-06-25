@@ -44,7 +44,7 @@ func (ctrl *quizSessionController) StartQuiz(c *gin.Context) {
 	}
 
 	// Get user ID from JWT token
-	userID, exists := c.Get("user_id")
+	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error": "User not authenticated",
@@ -189,7 +189,7 @@ func (ctrl *quizSessionController) SubmitQuiz(c *gin.Context) {
 // GET /api/v1/quiz/results?quiz_type=mock_test&limit=10
 func (ctrl *quizSessionController) GetUserResults(c *gin.Context) {
 	// Get user ID from JWT token
-	userID, exists := c.Get("user_id")
+	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error": "User not authenticated",
@@ -254,7 +254,7 @@ func (ctrl *quizSessionController) ResumeSession(c *gin.Context) {
 	}
 
 	// Get user ID from JWT token
-	userID, exists := c.Get("user_id")
+	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error": "User not authenticated",

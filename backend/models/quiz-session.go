@@ -197,25 +197,25 @@ func GetQuizConfig(quizType QuizType) QuizConfig {
 			Type:             MockTest,
 			MaxPoints:        1000,
 			TimeLimitMinutes: 60,
-			EasyPoints:       5,  // Easy questions worth 5 points
-			MediumPoints:     10, // Medium questions worth 10 points
-			HardPoints:       20, // Hard questions worth 20 points
+			EasyPoints:       10, // Easy questions worth 10 points
+			MediumPoints:     15, // Medium questions worth 15 points
+			HardPoints:       25, // Hard questions worth 25 points
 			// Questions will be dynamically allocated to reach ~1000 points
-			// Example: 80 easy (400pts) + 30 medium (300pts) + 15 hard (300pts) = 1000pts
+			// Target: ~50-100 questions total (10-25 points each = 1000 points)
 			TotalQuestions: 0, // Will be calculated based on available questions
 		}
 	case TimeQuiz:
 		return QuizConfig{
 			Type:             TimeQuiz,
-			MaxPoints:        200, // 10*5 + 5*10 + 5*20 = 200 points
+			MaxPoints:        200, // 10*10 + 5*15 + 5*25 = 300 points
 			TimeLimitMinutes: 5,
 			EasyQuestions:    10,
 			MediumQuestions:  5,
 			HardQuestions:    5,
 			TotalQuestions:   20,
-			EasyPoints:       5,
-			MediumPoints:     10,
-			HardPoints:       20,
+			EasyPoints:       10,
+			MediumPoints:     15,
+			HardPoints:       25,
 		}
 	default:
 		return QuizConfig{}

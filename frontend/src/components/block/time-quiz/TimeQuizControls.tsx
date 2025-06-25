@@ -36,9 +36,9 @@ export const TimeQuizControls: React.FC<TimeQuizControlsProps> = ({
         <div className="flex items-center justify-between">
           <Button
             onClick={onPreviousQuestion}
-            disabled={currentQuestionIndex === 0 || feedbackVisible}
+            disabled={currentQuestionIndex === 0}
             variant="outline"
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 transition-all duration-200 hover:bg-blue-50 hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ArrowLeft className="w-4 h-4" />
             Previous
@@ -50,7 +50,7 @@ export const TimeQuizControls: React.FC<TimeQuizControlsProps> = ({
                 onClick={onSkipQuestion}
                 disabled={feedbackVisible}
                 variant="secondary"
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 transition-all duration-200 hover:bg-yellow-50 hover:border-yellow-300"
               >
                 <SkipForward className="w-4 h-4" />
                 Skip
@@ -61,7 +61,7 @@ export const TimeQuizControls: React.FC<TimeQuizControlsProps> = ({
               <Button
                 onClick={onSubmitQuiz}
                 disabled={isSubmitting || feedbackVisible}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 transition-all duration-200 hover:bg-blue-600 disabled:opacity-50"
               >
                 <Flag className="w-4 h-4" />
                 {isSubmitting ? 'Submitting...' : 'Finish Quiz'}
@@ -70,7 +70,7 @@ export const TimeQuizControls: React.FC<TimeQuizControlsProps> = ({
               <Button
                 onClick={onNextQuestion}
                 disabled={feedbackVisible}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 transition-all duration-200 hover:bg-blue-600 disabled:opacity-50"
               >
                 Next
                 <ArrowRight className="w-4 h-4" />

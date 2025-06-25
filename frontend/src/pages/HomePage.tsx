@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { HomeNavbar, LiquidBackground, Hero, Demo, Features, Footer } from '@/components/block/home'
 import { useAuthInit } from '@/hooks/useAuthInit'
+import { QuizDebugPanel } from '@/components/quiz/QuizDebugPanel'
 
 export const HomePage = () => {
   const [scrollY, setScrollY] = useState(0)
@@ -31,6 +32,14 @@ export const HomePage = () => {
         <Hero />
         <Demo />
         <Features />
+        
+        {/* Debug Panel - Only in development */}
+        {import.meta.env.DEV && (
+          <div className="bg-white/95 backdrop-blur-sm">
+            <QuizDebugPanel />
+          </div>
+        )}
+        
         <Footer />
       </main>
     </div>
