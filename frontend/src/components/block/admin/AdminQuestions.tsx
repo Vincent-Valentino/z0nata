@@ -175,8 +175,6 @@ export const AdminQuestions = () => {
         errors.correctAnswers = 'At least one correct answer must be selected'
       } else if (newQuestion.type === 'single_choice' && newQuestion.correctAnswers.length > 1) {
         errors.correctAnswers = 'Single choice questions can only have one correct answer'
-      } else if (newQuestion.type === 'multiple_choice' && newQuestion.correctAnswers.length >= validOptions.length) {
-        errors.correctAnswers = 'Multiple choice questions cannot have all options as correct'
       }
     } else if (newQuestion.type === 'essay') {
       // Validate essay fields
