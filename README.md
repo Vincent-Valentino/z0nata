@@ -39,3 +39,16 @@ A modern, full-stack quiz application built with React (Frontend) and Go (Backen
   1. Login sebagai mahasiswa, dengan NIM dan email mahasiswa
   2. Login Oauth dengan Facebook, Google, dan Github
   3. Fitur Forgot password
+ 
+## Cara Menjalankan
+
+# Docker (Perlu install docker)
+- Git clone repo ini
+- docker-compose up --build
+- Frontend akan berjalan di localhost:5173 dan Backend akan berjalan di localhost:8080
+
+# Manual (Perlu install pnpm, vite, dan go)
+- Git clone repo ini
+- Ketik "cd frontend && pnpm run dev" untuk menjalankan frontend
+- Ketik "cd backend && go run main.go" untuk menjalankan backend
+- Frontend akan berjalan di localhost:5173 dan Backend akan berjalan di localhost:8080
