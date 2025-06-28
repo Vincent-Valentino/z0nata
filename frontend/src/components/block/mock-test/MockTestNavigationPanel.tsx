@@ -141,7 +141,7 @@ export const MockTestNavigationPanel: React.FC<MockTestNavigationPanelProps> = (
         {/* Question Grid/List */}
         <div className="space-y-4 max-h-96 overflow-y-auto">
           {viewMode === 'grid' ? (
-            <div className="grid grid-cols-5 lg:grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {filteredQuestions.map((item) => {
                 const isCurrentQuestion = item.index === currentQuestionIndex
                 const isAnsweredQuestion = answeredQuestions.has(item.index)
@@ -153,15 +153,19 @@ export const MockTestNavigationPanel: React.FC<MockTestNavigationPanelProps> = (
                     onClick={() => onQuestionNavigation(item.index)}
                     variant={isCurrentQuestion ? "default" : "outline"}
                     size="sm"
-                    className={`relative w-10 h-10 p-0 ${
-                      isAnsweredQuestion ? 'bg-green-100 border-green-300 hover:bg-green-200' :
-                      isSkippedQuestion ? 'bg-yellow-100 border-yellow-300 hover:bg-yellow-200' :
-                      'hover:bg-blue-100 hover:border-blue-300'
+                    className={`relative w-10 h-10 sm:w-12 sm:h-12 p-0 text-sm sm:text-base transition-all ${
+                      isAnsweredQuestion ? 'bg-green-100 border-green-300 hover:bg-green-200 text-green-800 font-semibold' :
+                      isSkippedQuestion ? 'bg-yellow-100 border-yellow-300 hover:bg-yellow-200 text-yellow-800 font-semibold' :
+                      isCurrentQuestion ? 'font-semibold' :
+                      'hover:bg-blue-100 hover:border-blue-300 font-medium'
                     }`}
                   >
                     {item.index + 1}
                     {isAnsweredQuestion && (
-                      <CheckCircle2 className="w-3 h-3 absolute -top-1 -right-1 text-green-600" />
+                      <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4 absolute -top-1 -right-1 text-green-600" />
+                    )}
+                    {isSkippedQuestion && !isAnsweredQuestion && (
+                      <div className="w-3 h-3 sm:w-4 sm:h-4 absolute -top-1 -right-1 bg-yellow-500 rounded-full" />
                     )}
                   </Button>
                 )
@@ -180,8 +184,8 @@ export const MockTestNavigationPanel: React.FC<MockTestNavigationPanelProps> = (
                     onClick={() => onQuestionNavigation(item.index)}
                     variant={isCurrentQuestion ? "default" : "outline"}
                     className={`w-full text-left justify-start h-auto py-2 px-3 ${
-                      isAnsweredQuestion ? 'bg-green-50 border-green-300' :
-                      isSkippedQuestion ? 'bg-yellow-50 border-yellow-300' :
+                      isAnsweredQuestion ? 'bg-green-50 border-green-300 text-green-800' :
+                      isSkippedQuestion ? 'bg-yellow-50 border-yellow-300 text-yellow-800' :
                       ''
                     }`}
                   >

@@ -19,6 +19,7 @@ func SetupQuizSessionRoutes(router *gin.Engine, ctrl controllers.QuizSessionCont
 		quiz.GET("/session/:token", ctrl.GetSession)                   // Get session details
 		quiz.POST("/session/:token/answer", ctrl.SaveAnswer)           // Save question answer
 		quiz.POST("/session/:token/navigate", ctrl.NavigateToQuestion) // Navigate to question
+		quiz.POST("/session/:token/skip", ctrl.SkipQuestion)           // Skip question
 		quiz.POST("/session/:token/submit", ctrl.SubmitQuiz)           // Submit quiz for grading
 
 		// Session Recovery

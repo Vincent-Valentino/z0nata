@@ -111,3 +111,45 @@ func GenerateRandomToken(length int) (string, error) {
 	}
 	return base64.URLEncoding.EncodeToString(bytes), nil
 }
+
+// GenerateRecoveryCode generates a human-readable recovery code like "ABCD-1234"
+func GenerateRecoveryCode() (string, error) {
+	// Generate 4 uppercase letters
+	letters := make([]byte, 4)
+	_, err := rand.Read(letters)
+	if err != nil {
+		return "", err
+	}
+
+	// Convert to uppercase letters A-Z
+	for i := range letters {
+		letters[i] = 'A' + (letters[i] % 26)
+	}
+
+	// Generate 4 digits
+	digits := make([]byte, 4)
+	_, err = rand.Read(digits)
+	if err != nil {
+		return "", err
+	}
+
+	// Convert to digits 0-9
+	for i := range digits {
+		digits[i] = '0' + (digits[i] % 10)
+	}
+
+	return fmt.Sprintf("%s-%s", string(letters), string(digits)), nil
+}
+
+// GenerateRecoveryCodes generates a set of recovery codes for a user
+func GenerateRecoveryCodes(count int) ([]string, error) {
+	codes := make([]string, count)
+	for i := 0; i < count; i++ {
+		code, err := GenerateRecoveryCode()
+		if err != nil {
+			return nil, err
+		}
+		codes[i] = code
+	}
+	return codes, nil
+}

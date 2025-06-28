@@ -505,7 +505,7 @@ export const AdminDocumentation = () => {
       <div className="flex-shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold">Documentation Management</h1>
-          <p className="text-muted-foreground">Create and manage learning modules with drag-and-drop ordering</p>
+          <p className="text-muted-foreground">Create and manage learning modules with drag-and-drop ordering (numbering handled in markdown content)</p>
         </div>
         
         <Button onClick={() => {

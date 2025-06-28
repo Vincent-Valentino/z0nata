@@ -416,12 +416,13 @@ func (uc *UserController) RequestPasswordReset(c *gin.Context) {
 		return
 	}
 
-	if err := uc.userService.RequestPasswordReset(c.Request.Context(), &req); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send reset email"})
+	response, err := uc.userService.RequestPasswordReset(c.Request.Context(), &req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process password reset request"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Password reset email sent"})
+	c.JSON(http.StatusOK, response)
 }
 
 // @Summary Reset password

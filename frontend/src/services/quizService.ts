@@ -10,7 +10,8 @@ import type {
   SubmitQuizResponse,
   GetSessionResponse,
   ResumeSessionResponse,
-  DetailedQuizResult
+  DetailedQuizResult,
+  SkipQuestionRequest
 } from '@/types/quiz'
 
 class QuizService {
@@ -49,7 +50,35 @@ class QuizService {
   // Navigate to a specific question
   async navigateToQuestion(sessionToken: string, questionIndex: number): Promise<void> {
     const request: NavigateQuestionRequest = { question_index: questionIndex }
-    await api.post(`/quiz/session/${sessionToken}/navigate`, request)
+    
+    try {
+      await api.post(`/quiz/session/${sessionToken}/navigate`, request)
+    } catch (error: any) {
+      // Handle specific navigation errors more gracefully
+      if (error?.response?.status === 400) {
+        console.warn(`Navigation to question ${questionIndex} rejected by backend, but continuing with local state`)
+        return // Don't throw error for invalid navigation requests
+      }
+      
+      if (error?.response?.status === 409) {
+        console.warn(`Question ${questionIndex} state conflict, but continuing with local state`)
+        return // Don't throw error for state conflicts
+      }
+      
+      // Only throw for serious errors (401, 403, 500, network issues)
+      if (this.isQuizExpiredError(error) || this.isUnauthorizedError(error) || error?.response?.status >= 500) {
+        throw error
+      }
+      
+      // Log other errors but don't throw
+      console.warn(`Navigation sync failed for question ${questionIndex}:`, error?.response?.data?.error || error.message)
+    }
+  }
+
+  // Skip a question
+  async skipQuestion(sessionToken: string, questionIndex: number, timeSpent: number): Promise<void> {
+    const request: SkipQuestionRequest = { question_index: questionIndex, time_spent: timeSpent }
+    await api.post(`/quiz/session/${sessionToken}/skip`, request)
   }
 
   // Submit the quiz for final scoring

@@ -280,3 +280,90 @@ func (c *UserActivityController) GetPerformanceSummary(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, summary)
 }
+
+// GetUserResultsByUserID gets quiz results for a specific user by user ID (with authorization)
+func (c *UserActivityController) GetUserResultsByUserID(ctx *gin.Context) {
+	// Get the requesting user from context
+	requestingUserID, exists := ctx.Get("userID")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	requestingUserObjID, ok := requestingUserID.(primitive.ObjectID)
+	if !ok {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid requesting user ID format"})
+		return
+	}
+
+	// Get target user ID from URL parameter
+	targetUserIDParam := ctx.Param("userID")
+	targetUserObjID, err := primitive.ObjectIDFromHex(targetUserIDParam)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid target user ID format"})
+		return
+	}
+
+	// Authorization: Users can only view their own results unless they're admin
+	// For now, we'll allow users to view their own results only
+	// In future, add admin role check here
+	if requestingUserObjID != targetUserObjID {
+		ctx.JSON(http.StatusForbidden, gin.H{"error": "You can only view your own results"})
+		return
+	}
+
+	// Parse query parameters
+	var filter models.QuizResultsFilter
+	if err := ctx.ShouldBindQuery(&filter); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get results using existing service method
+	response, err := c.userActivityService.GetUserResults(ctx, targetUserObjID, filter)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, response)
+}
+
+// GetUserStatsByUserID gets statistics for a specific user by user ID (with authorization)
+func (c *UserActivityController) GetUserStatsByUserID(ctx *gin.Context) {
+	// Get the requesting user from context
+	requestingUserID, exists := ctx.Get("userID")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	requestingUserObjID, ok := requestingUserID.(primitive.ObjectID)
+	if !ok {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid requesting user ID format"})
+		return
+	}
+
+	// Get target user ID from URL parameter
+	targetUserIDParam := ctx.Param("userID")
+	targetUserObjID, err := primitive.ObjectIDFromHex(targetUserIDParam)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid target user ID format"})
+		return
+	}
+
+	// Authorization: Users can only view their own stats unless they're admin
+	if requestingUserObjID != targetUserObjID {
+		ctx.JSON(http.StatusForbidden, gin.H{"error": "You can only view your own statistics"})
+		return
+	}
+
+	// Get statistics using existing service method
+	stats, err := c.userActivityService.GetUserStats(ctx, targetUserObjID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, stats)
+}

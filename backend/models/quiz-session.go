@@ -60,6 +60,7 @@ type SessionQuestion struct {
 	// Shuffled options for this session
 	Options        []Option `json:"options" bson:"options"`
 	CorrectAnswers []string `json:"-" bson:"correct_answers"` // Hidden from frontend
+	SampleAnswer   string   `json:"-" bson:"sample_answer"`   // Hidden from frontend, for essay questions
 
 	// User's response
 	UserAnswer   interface{} `json:"user_answer,omitempty" bson:"user_answer,omitempty"` // string or []string
@@ -152,11 +153,17 @@ type SaveAnswerResponse struct {
 	IsCorrect     bool        `json:"is_correct,omitempty"`     // Only for TimeQuiz immediate feedback
 	CorrectAnswer interface{} `json:"correct_answer,omitempty"` // Only for TimeQuiz immediate feedback
 	PointsEarned  int         `json:"points_earned,omitempty"`  // Only for TimeQuiz immediate feedback
+	SampleAnswer  string      `json:"sample_answer,omitempty"`  // For essay questions in TimeQuiz
 	Message       string      `json:"message"`
 }
 
 type NavigateQuestionRequest struct {
 	QuestionIndex int `json:"question_index" binding:"required"`
+}
+
+type SkipQuestionRequest struct {
+	QuestionIndex int   `json:"question_index" binding:"required"`
+	TimeSpent     int64 `json:"time_spent" binding:"required"` // seconds spent on this question
 }
 
 type SubmitQuizRequest struct {
@@ -165,7 +172,6 @@ type SubmitQuizRequest struct {
 
 type SubmitQuizResponse struct {
 	Result  DetailedQuizResult `json:"result"`
-	Success bool               `json:"success"`
 	Message string             `json:"message"`
 }
 

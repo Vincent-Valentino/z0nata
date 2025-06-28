@@ -34,32 +34,36 @@ export const TimeQuizHeader: React.FC<TimeQuizHeaderProps> = ({
   }
 
   return (
-    <Card className="shadow-lg">
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-4">
-            <Badge variant="outline" className="text-sm">
+    <Card className="shadow-lg md:shadow-lg shadow-none md:rounded-lg rounded-none">
+      <CardContent className="p-3 sm:p-4 md:p-6">
+        <div className="flex flex-col gap-3 mb-3 md:mb-4">
+          {/* Top row - Badge and Timer */}
+          <div className="flex items-center justify-between">
+            <Badge variant="outline" className="text-xs sm:text-sm">
               Time Quiz
             </Badge>
-            <div className={`flex items-center gap-2 font-mono text-lg font-bold ${getTimerColor()}`}>
-              <Clock className="w-5 h-5" />
+            <div className={`flex items-center gap-1.5 sm:gap-2 font-mono text-base sm:text-lg font-bold ${getTimerColor()}`}>
+              <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
               {formatTime(timeRemaining)}
             </div>
           </div>
           
-          <div className="text-right">
-            <div className="text-sm text-gray-600">
-              Question {currentQuestionIndex + 1} of {totalQuestions}
-            </div>
-            <div className="text-sm text-gray-500">
-              {stats.answeredCount} answered • {stats.skippedCount} skipped
+          {/* Second row - Question info */}
+          <div className="flex items-center justify-between">
+            <div className="text-left">
+              <div className="text-xs sm:text-sm text-gray-600">
+                Question {currentQuestionIndex + 1} of {totalQuestions}
+              </div>
+              <div className="text-xs sm:text-sm text-gray-500">
+                {stats.answeredCount} answered • {stats.skippedCount} skipped
+              </div>
             </div>
           </div>
         </div>
         
         <Progress 
           value={progressPercentage} 
-          className="h-2"
+          className="h-1.5 sm:h-2 mb-3 md:mb-4"
         />
       </CardContent>
     </Card>

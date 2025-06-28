@@ -39,8 +39,9 @@ export const MockTestControls: React.FC<MockTestControlsProps> = ({
 
   return (
     <Card className="shadow-md">
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between">
+      <CardContent className="p-3 sm:p-4">
+        {/* Desktop Layout */}
+        <div className="hidden sm:flex items-center justify-between">
           <Button
             onClick={onPreviousQuestion}
             disabled={isFirstQuestion}
@@ -91,6 +92,72 @@ export const MockTestControls: React.FC<MockTestControlsProps> = ({
                 <ArrowRight className="w-4 h-4" />
               </Button>
             )}
+          </div>
+        </div>
+
+        {/* Mobile Layout */}
+        <div className="sm:hidden space-y-3">
+          {/* Top row - Navigation buttons */}
+          <div className="flex justify-between gap-2">
+            <Button
+              onClick={onPreviousQuestion}
+              disabled={isFirstQuestion}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-1.5 flex-1"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden xs:inline">Previous</span>
+              <span className="xs:hidden">Prev</span>
+            </Button>
+
+            {isLastQuestion ? (
+              <Button
+                onClick={onSubmitQuiz}
+                disabled={isSubmitting}
+                size="sm"
+                className="flex items-center gap-1.5 flex-1"
+              >
+                <Flag className="w-4 h-4" />
+                {isSubmitting ? 'Submitting...' : 'Submit'}
+              </Button>
+            ) : (
+              <Button
+                onClick={onNextQuestion}
+                disabled={isLastQuestion}
+                size="sm"
+                className="flex items-center gap-1.5 flex-1"
+              >
+                <span className="hidden xs:inline">Next</span>
+                <span className="xs:hidden">Next</span>
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+
+          {/* Bottom row - Action buttons */}
+          <div className="flex gap-2">
+            {!isAnswered && !isSkipped && (
+              <Button
+                onClick={onSkipQuestion}
+                variant="secondary"
+                size="sm"
+                className="flex items-center gap-1.5 flex-1"
+              >
+                <SkipForward className="w-4 h-4" />
+                Skip
+              </Button>
+            )}
+
+            <Button
+              onClick={onShowReview}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-1.5 flex-1"
+            >
+              <Eye className="w-4 h-4" />
+              Review
+            </Button>
           </div>
         </div>
       </CardContent>

@@ -47,6 +47,9 @@ type User struct {
 	ResetToken       string    `json:"-" bson:"reset_token,omitempty"`
 	ResetTokenExpiry time.Time `json:"-" bson:"reset_token_expiry,omitempty"`
 
+	// Recovery codes for password reset (single-use backup codes)
+	RecoveryCodes []string `json:"-" bson:"recovery_codes,omitempty"`
+
 	// Email verification
 	VerificationToken string `json:"-" bson:"verification_token,omitempty"`
 
@@ -127,6 +130,25 @@ type ChangePasswordRequest struct {
 
 type RefreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+// Recovery Codes Models
+type PasswordResetWithRecoveryRequest struct {
+	Email        string `json:"email" binding:"required,email"`
+	RecoveryCode string `json:"recovery_code" binding:"required"`
+	NewPassword  string `json:"new_password" binding:"required,min=8"`
+}
+
+type RecoveryCodesResponse struct {
+	Codes   []string `json:"codes"`
+	Message string   `json:"message"`
+}
+
+type PasswordResetOptionsResponse struct {
+	Message          string   `json:"message"`
+	Options          []string `json:"options"`
+	HasRecoveryCodes bool     `json:"has_recovery_codes"`
+	SupportContact   string   `json:"support_contact,omitempty"`
 }
 
 // Access Request Models

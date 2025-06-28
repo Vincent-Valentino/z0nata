@@ -21,6 +21,7 @@ type QuizSessionRepository interface {
 	GetActiveSessionByUser(ctx context.Context, userID primitive.ObjectID, quizType models.QuizType) (*models.QuizSession, error)
 	UpdateSession(ctx context.Context, session *models.QuizSession) error
 	UpdateQuestionAnswer(ctx context.Context, sessionID primitive.ObjectID, questionIndex int, answer interface{}, timeSpent int64) error
+	SkipQuestion(ctx context.Context, sessionID primitive.ObjectID, questionIndex int, timeSpent int64) error
 	UpdateSessionProgress(ctx context.Context, sessionID primitive.ObjectID, currentQuestion, answeredCount, skippedCount int) error
 	MarkSessionCompleted(ctx context.Context, sessionID primitive.ObjectID, endTime time.Time) error
 
@@ -146,6 +147,42 @@ func (r *quizSessionRepository) UpdateQuestionAnswer(ctx context.Context, sessio
 	result, err := r.sessionCollection.UpdateOne(ctx, filter, updates, opts)
 	if err != nil {
 		return fmt.Errorf("failed to update question answer: %w", err)
+	}
+
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("quiz session not found")
+	}
+
+	return nil
+}
+
+func (r *quizSessionRepository) SkipQuestion(ctx context.Context, sessionID primitive.ObjectID, questionIndex int, timeSpent int64) error {
+	filter := bson.M{"_id": sessionID}
+
+	now := time.Now()
+	updates := bson.M{
+		"$set": bson.M{
+			fmt.Sprintf("questions.%d.is_skipped", questionIndex):       true,
+			fmt.Sprintf("questions.%d.is_answered", questionIndex):      false,
+			fmt.Sprintf("questions.%d.time_spent", questionIndex):       timeSpent,
+			fmt.Sprintf("questions.%d.last_modified_at", questionIndex): now,
+			"updated_at": now,
+		},
+		"$inc": bson.M{
+			fmt.Sprintf("questions.%d.visit_count", questionIndex): 1,
+		},
+		"$setOnInsert": bson.M{
+			fmt.Sprintf("questions.%d.first_attempt_at", questionIndex): now,
+		},
+		"$unset": bson.M{
+			fmt.Sprintf("questions.%d.user_answer", questionIndex): "",
+		},
+	}
+
+	opts := options.Update().SetUpsert(false)
+	result, err := r.sessionCollection.UpdateOne(ctx, filter, updates, opts)
+	if err != nil {
+		return fmt.Errorf("failed to skip question: %w", err)
 	}
 
 	if result.MatchedCount == 0 {

@@ -256,9 +256,9 @@ export const AddQuestionDialog = ({
           {newQuestion.type === 'essay' && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Sample Answer</label>
+                <label className="text-sm font-medium">Answer</label>
                 <Textarea
-                  placeholder="Provide a sample answer or key points that should be covered..."
+                  placeholder="Add the answer to the question"
                   value={newQuestion.sampleAnswer}
                   onChange={(e) => {
                     setNewQuestion({ ...newQuestion, sampleAnswer: e.target.value })

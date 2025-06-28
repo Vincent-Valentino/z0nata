@@ -16,6 +16,7 @@ type QuizSessionController interface {
 	GetSession(c *gin.Context)
 	SaveAnswer(c *gin.Context)
 	NavigateToQuestion(c *gin.Context)
+	SkipQuestion(c *gin.Context)
 	SubmitQuiz(c *gin.Context)
 	GetUserResults(c *gin.Context)
 	ResumeSession(c *gin.Context)
@@ -159,6 +160,41 @@ func (ctrl *quizSessionController) NavigateToQuestion(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "Navigation successful",
+	})
+}
+
+// SkipQuestion skips a question and marks it as skipped
+// POST /api/v1/quiz/session/:token/skip
+func (ctrl *quizSessionController) SkipQuestion(c *gin.Context) {
+	sessionToken := c.Param("token")
+	if sessionToken == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Session token is required",
+		})
+		return
+	}
+
+	var req models.SkipQuestionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request format",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	err := ctrl.quizSessionService.SkipQuestion(c.Request.Context(), sessionToken, &req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Failed to skip question",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Question skipped successfully",
 	})
 }
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuiz } from '@/contexts/QuizContext'
 import { useAuthStore } from '@/store/authStore'
@@ -8,6 +8,7 @@ import {
   MockTestLoading,
   MockTestExpired,
   MockTestNavigationPanel,
+  MockTestMobileNavigation,
   MockTestQuestionCard,
   MockTestControls,
   MockTestReviewModal,
@@ -31,7 +32,8 @@ const MockTestPage: React.FC = () => {
     skipQuestion,
     resetQuiz,
     getCurrentQuestion,
-    checkForActiveSession
+    checkForActiveSession,
+    getQuestionNavigationItems
   } = useQuiz()
 
   const [selectedAnswer, setSelectedAnswer] = useState<string | string[]>('')
@@ -47,6 +49,11 @@ const MockTestPage: React.FC = () => {
   const [showReviewMode, setShowReviewMode] = useState(false)
   const [showStats, setShowStats] = useState(false)
 
+  // Essay answer debouncing
+  const [essayAnswer, setEssayAnswer] = useState<string>('')
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const lastSavedAnswerRef = useRef<string>('')
+
   // Check authentication and redirect if not authenticated
   useEffect(() => {
     if (!isAuthenticated) {
@@ -55,6 +62,16 @@ const MockTestPage: React.FC = () => {
       return
     }
   }, [isAuthenticated, navigate])
+
+  // Sync selectedAnswer when current question changes
+  useEffect(() => {
+    const savedAnswer = state.answers.get(state.currentQuestionIndex)
+    if (savedAnswer !== undefined) {
+      setSelectedAnswer(savedAnswer)
+    } else {
+      setSelectedAnswer('')
+    }
+  }, [state.currentQuestionIndex, state.answers])
 
   // Initialize quiz on page load
   useEffect(() => {
@@ -197,7 +214,25 @@ const MockTestPage: React.FC = () => {
     await saveAnswer(state.currentQuestionIndex, newAnswer, false)
   }
 
+  const handleEssayAnswerChange = (answer: string) => {
+    const currentQuestion = getCurrentQuestion()
+    if (!currentQuestion || state.isExpired) return
+
+    setEssayAnswer(answer)
+    setSelectedAnswer(answer)
+
+    // Use debounced saving for essay answers
+    debouncedSaveEssayAnswer(answer)
+  }
+
   const handleSkipQuestion = async () => {
+    // Save essay answer before skipping if there's unsaved content
+    const currentQuestion = getCurrentQuestion()
+    if (currentQuestion?.type === 'essay' && essayAnswer !== lastSavedAnswerRef.current) {
+      await saveAnswer(state.currentQuestionIndex, essayAnswer, false)
+      lastSavedAnswerRef.current = essayAnswer
+    }
+
     await skipQuestion(state.currentQuestionIndex)
     
     if (state.currentQuestionIndex < state.totalQuestions - 1) {
@@ -206,10 +241,24 @@ const MockTestPage: React.FC = () => {
   }
 
   const handleQuestionNavigation = async (questionIndex: number) => {
+    // Save essay answer before navigating if there's unsaved content
+    const currentQuestion = getCurrentQuestion()
+    if (currentQuestion?.type === 'essay' && essayAnswer !== lastSavedAnswerRef.current) {
+      await saveAnswer(state.currentQuestionIndex, essayAnswer, false)
+      lastSavedAnswerRef.current = essayAnswer
+    }
+
     await goToQuestion(questionIndex)
   }
 
   const handleSubmitQuiz = async () => {
+    // Save essay answer before submitting if there's unsaved content
+    const currentQuestion = getCurrentQuestion()
+    if (currentQuestion?.type === 'essay' && essayAnswer !== lastSavedAnswerRef.current) {
+      await saveAnswer(state.currentQuestionIndex, essayAnswer, false)
+      lastSavedAnswerRef.current = essayAnswer
+    }
+
     await submitQuiz()
   }
 
@@ -225,6 +274,54 @@ const MockTestPage: React.FC = () => {
   const currentQuestion = getCurrentQuestion()
   const isAnswered = state.answeredQuestions.has(state.currentQuestionIndex)
   const isSkipped = state.skippedQuestions.has(state.currentQuestionIndex)
+
+  // Essay answer debouncing
+  useEffect(() => {
+    const currentQuestion = getCurrentQuestion()
+    if (!currentQuestion) return
+
+    const savedAnswer = state.answers.get(state.currentQuestionIndex)
+    if (savedAnswer !== undefined) {
+      if (currentQuestion.type === 'essay') {
+        setEssayAnswer(typeof savedAnswer === 'string' ? savedAnswer : '')
+      }
+    } else {
+      if (currentQuestion.type === 'essay') {
+        setEssayAnswer('')
+      }
+    }
+  }, [state.currentQuestionIndex, state.answers, getCurrentQuestion])
+
+  // Debounced save for essay answers
+  const debouncedSaveEssayAnswer = (answer: string) => {
+    // Clear existing timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current)
+    }
+
+    // Only save if answer has actually changed
+    if (answer === lastSavedAnswerRef.current) {
+      return
+    }
+
+    // Set new timeout
+    debounceTimeoutRef.current = setTimeout(async () => {
+      if (answer !== lastSavedAnswerRef.current) {
+        lastSavedAnswerRef.current = answer
+        // Save without auto-save for MockTest (no immediate feedback)
+        await saveAnswer(state.currentQuestionIndex, answer, false)
+      }
+    }, 1000) // Save after 1 second of no typing
+  }
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Loading state
   if (state.isLoading) {
@@ -255,58 +352,123 @@ const MockTestPage: React.FC = () => {
 
   // Main quiz interface
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 p-4">
-      <div className="max-w-7xl mx-auto space-y-6">
-        
-        {/* Header with Timer and Progress */}
-        <MockTestHeader
-          timeRemaining={state.timeRemaining}
-          currentQuestionIndex={state.currentQuestionIndex}
-          totalQuestions={state.totalQuestions}
-          progressPercentage={state.progressPercentage}
-          questionStats={questionStats}
-          showStats={showStats}
-          showQuestionPanel={showQuestionPanel}
-          onToggleStats={() => setShowStats(!showStats)}
-          onToggleQuestionPanel={() => setShowQuestionPanel(!showQuestionPanel)}
-        />
-
-        <div className={`grid ${showQuestionPanel ? 'grid-cols-1 lg:grid-cols-4' : 'grid-cols-1'} gap-6`}>
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100">
+      {/* Desktop/Tablet Layout */}
+      <div className="hidden md:block p-4">
+        <div className="max-w-7xl mx-auto space-y-6">
           
-          {/* Advanced Question Navigation Panel */}
-          {showQuestionPanel && (
-            <MockTestNavigationPanel
-              viewMode={viewMode}
-              searchQuery={searchQuery}
-              questionFilter={questionFilter}
-              filteredQuestions={filteredQuestions}
-              currentQuestionIndex={state.currentQuestionIndex}
-              answeredQuestions={state.answeredQuestions}
-              skippedQuestions={state.skippedQuestions}
-              onViewModeChange={setViewMode}
-              onSearchChange={setSearchQuery}
-              onFilterChange={setQuestionFilter}
-              onClearFilters={clearFilters}
-              onQuestionNavigation={handleQuestionNavigation}
-            />
-          )}
+          {/* Header with Timer and Progress */}
+          <MockTestHeader
+            timeRemaining={state.timeRemaining}
+            currentQuestionIndex={state.currentQuestionIndex}
+            totalQuestions={state.totalQuestions}
+            progressPercentage={state.progressPercentage}
+            questionStats={questionStats}
+            showStats={showStats}
+            showQuestionPanel={showQuestionPanel}
+            onToggleStats={() => setShowStats(!showStats)}
+            onToggleQuestionPanel={() => setShowQuestionPanel(!showQuestionPanel)}
+          />
 
-          {/* Main Question Area */}
-          <div className={`${showQuestionPanel ? 'lg:col-span-3 lg:order-1' : ''} space-y-6`}>
+          <div className={`grid ${showQuestionPanel ? 'grid-cols-1 lg:grid-cols-4' : 'grid-cols-1'} gap-6`}>
+            
+            {/* Advanced Question Navigation Panel */}
+            {showQuestionPanel && (
+              <MockTestNavigationPanel
+                viewMode={viewMode}
+                searchQuery={searchQuery}
+                questionFilter={questionFilter}
+                filteredQuestions={filteredQuestions}
+                currentQuestionIndex={state.currentQuestionIndex}
+                answeredQuestions={state.answeredQuestions}
+                skippedQuestions={state.skippedQuestions}
+                onViewModeChange={setViewMode}
+                onSearchChange={setSearchQuery}
+                onFilterChange={setQuestionFilter}
+                onClearFilters={clearFilters}
+                onQuestionNavigation={handleQuestionNavigation}
+              />
+            )}
+
+            {/* Main Question Area */}
+            <div className={`${showQuestionPanel ? 'lg:col-span-3 lg:order-1' : ''} space-y-6`}>
+              
+              {/* Question Card */}
+              {currentQuestion && (
+                <MockTestQuestionCard
+                  question={currentQuestion}
+                  selectedAnswer={currentQuestion.type === 'essay' ? essayAnswer : selectedAnswer}
+                  isAnswered={isAnswered}
+                  isSkipped={isSkipped}
+                  isExpired={state.isExpired}
+                  onAnswerSelect={handleAnswerSelect}
+                  onEssayAnswerChange={handleEssayAnswerChange}
+                />
+              )}
+
+              {/* Navigation Controls */}
+              <MockTestControls
+                currentQuestionIndex={state.currentQuestionIndex}
+                totalQuestions={state.totalQuestions}
+                isAnswered={isAnswered}
+                isSkipped={isSkipped}
+                isSubmitting={state.isSubmitting}
+                onPreviousQuestion={previousQuestion}
+                onNextQuestion={nextQuestion}
+                onSkipQuestion={handleSkipQuestion}
+                onShowReview={() => setShowReviewMode(true)}
+                onSubmitQuiz={handleSubmitQuiz}
+              />
+            </div>
+          </div>
+
+          {/* Review Mode Modal */}
+          <MockTestReviewModal
+            isOpen={showReviewMode}
+            questionStats={questionStats}
+            isSubmitting={state.isSubmitting}
+            onClose={() => setShowReviewMode(false)}
+            onSubmitQuiz={handleSubmitQuiz}
+          />
+        </div>
+      </div>
+
+      {/* Mobile Layout */}
+      <div className="md:hidden">
+        <div className="pb-32"> {/* Bottom padding for mobile navigation */}
+          
+          {/* Mobile Header */}
+          <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-200">
+            <MockTestHeader
+              timeRemaining={state.timeRemaining}
+              currentQuestionIndex={state.currentQuestionIndex}
+              totalQuestions={state.totalQuestions}
+              progressPercentage={state.progressPercentage}
+              questionStats={questionStats}
+              showStats={showStats}
+              showQuestionPanel={false} // Always false on mobile
+              onToggleStats={() => setShowStats(!showStats)}
+              onToggleQuestionPanel={() => {}} // No-op on mobile
+            />
+          </div>
+
+          {/* Mobile Question Content */}
+          <div className="p-3 sm:p-4 space-y-6">
             
             {/* Question Card */}
             {currentQuestion && (
               <MockTestQuestionCard
                 question={currentQuestion}
-                selectedAnswer={selectedAnswer}
+                selectedAnswer={currentQuestion.type === 'essay' ? essayAnswer : selectedAnswer}
                 isAnswered={isAnswered}
                 isSkipped={isSkipped}
                 isExpired={state.isExpired}
                 onAnswerSelect={handleAnswerSelect}
+                onEssayAnswerChange={handleEssayAnswerChange}
               />
             )}
 
-            {/* Navigation Controls */}
+            {/* Mobile Navigation Controls */}
             <MockTestControls
               currentQuestionIndex={state.currentQuestionIndex}
               totalQuestions={state.totalQuestions}
@@ -320,6 +482,23 @@ const MockTestPage: React.FC = () => {
               onSubmitQuiz={handleSubmitQuiz}
             />
           </div>
+        </div>
+
+        {/* Mobile Navigation */}
+        <div className="md:hidden">
+          <MockTestMobileNavigation
+            filteredQuestions={filteredQuestions}
+            currentQuestionIndex={state.currentQuestionIndex}
+            answeredQuestions={state.answeredQuestions}
+            skippedQuestions={state.skippedQuestions}
+            onQuestionNavigation={handleQuestionNavigation}
+            searchQuery={searchQuery}
+            questionFilter={questionFilter}
+            onSearchChange={setSearchQuery}
+            onFilterChange={setQuestionFilter}
+            onClearFilters={clearFilters}
+            totalQuestions={state.totalQuestions}
+          />
         </div>
 
         {/* Review Mode Modal */}

@@ -1,22 +1,25 @@
+import { useNavigate } from 'react-router-dom'
+
 export const Footer = () => {
   const currentYear = new Date().getFullYear()
+  const navigate = useNavigate()
 
   const footerSections = [
     {
       title: 'Mulai Belajar',
       links: [
-        { name: 'Dokumentasi', href: '#dokumentasi' },
-        { name: 'Mock Test', href: '#mock-test' },
-        { name: 'Time Quiz', href: '#time-quiz' }
+        { name: 'Dokumentasi', href: '/dokumentasi' },
+        { name: 'Mock Test', href: '/mock-test' },
+        { name: 'Time Quiz', href: '/time-quiz' }
       ]
     },
     {
       title: 'FAQ',
       links: [
-        { name: 'Cara menggunakan platform', href: '#faq-cara' },
-        { name: 'Syarat dan ketentuan', href: '#faq-syarat' },
-        { name: 'Sistem penilaian', href: '#faq-scoring' },
-        { name: 'Akses untuk non-Mikroskil', href: '#faq-akses' }
+        { name: 'Cara menggunakan platform', href: '/faq#cara' },
+        { name: 'Syarat dan ketentuan', href: '/faq#syarat' },
+        { name: 'Sistem penilaian', href: '/faq#scoring' },
+        { name: 'Akses untuk non-Mikroskil', href: '/faq#akses' }
       ]
     }
   ]
@@ -27,6 +30,15 @@ export const Footer = () => {
     'Alvin Liandy',
     'Aleshi Agung Wicaksono'
   ]
+
+  const handleNavigation = (href: string) => {
+    if (href.startsWith('/faq')) {
+      // For now, show an alert since FAQ page doesn't exist yet
+      alert('Halaman FAQ akan segera tersedia.')
+      return
+    }
+    navigate(href)
+  }
 
   return (
     <footer className="bg-gray-900 text-white">
@@ -80,9 +92,9 @@ export const Footer = () => {
                 <ul className="space-y-3 sm:space-y-4">
                   {section.links.map((link, linkIndex) => (
                     <li key={linkIndex}>
-                      <a
-                        href={link.href}
-                        className="text-gray-400 hover:text-emerald-400 transition-all duration-200 flex items-center gap-3 group text-sm sm:text-base"
+                      <button
+                        onClick={() => handleNavigation(link.href)}
+                        className="text-gray-400 hover:text-emerald-400 transition-all duration-200 flex items-center gap-3 group text-sm sm:text-base w-full text-left"
                       >
                         <div className={`w-1 h-1 rounded-full transition-all duration-200 flex-shrink-0 ${
                           section.title === 'Mulai Belajar'
@@ -92,7 +104,7 @@ export const Footer = () => {
                         <span className="group-hover:translate-x-1 transition-transform duration-200 leading-relaxed">
                           {link.name}
                         </span>
-                      </a>
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -109,12 +121,18 @@ export const Footer = () => {
             </div>
             
             <div className="flex gap-4 sm:gap-6 text-xs sm:text-sm">
-              <a href="#privacy" className="text-gray-400 hover:text-emerald-400 transition-colors">
+              <button 
+                onClick={() => navigate('/privacy')}
+                className="text-gray-400 hover:text-emerald-400 transition-colors"
+              >
                 Privacy Policy
-              </a>
-              <a href="#terms" className="text-gray-400 hover:text-emerald-400 transition-colors">
+              </button>
+              <button 
+                onClick={() => navigate('/terms')}
+                className="text-gray-400 hover:text-emerald-400 transition-colors"
+              >
                 Terms of Service
-              </a>
+              </button>
             </div>
           </div>
         </div>

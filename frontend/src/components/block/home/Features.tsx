@@ -1,4 +1,10 @@
+import { useNavigate } from 'react-router-dom'
+import { useAuthStore } from '@/store/authStore'
+
 export const Features = () => {
+  const navigate = useNavigate()
+  const { isAuthenticated } = useAuthStore()
+
   const learningFeatures = [
     {
       icon: '📚',
@@ -152,8 +158,11 @@ export const Features = () => {
                 </ul>
 
                 {feature.highlight && (
-                  <button className={`w-full py-3 px-4 ${colorClasses.button} text-white rounded-lg font-medium transition-colors duration-200`}>
-                    Mulai Belajar →
+                  <button 
+                    onClick={() => navigate('/dokumentasi')}
+                    className={`w-full py-2.5 sm:py-3 px-3 sm:px-4 ${colorClasses.button} text-white rounded-lg font-medium transition-colors duration-200 text-sm sm:text-base min-h-[44px] touch-manipulation`}
+                  >
+                    <span className="truncate">Mulai Belajar →</span>
                   </button>
                 )}
               </div>
@@ -208,7 +217,21 @@ export const Features = () => {
                   ))}
                 </ul>
 
-                <button className={`w-full py-3 px-4 ${colorClasses.button} text-white rounded-lg font-medium transition-colors duration-200`}>
+                <button className={`w-full py-3 px-4 rounded-lg font-medium transition-colors duration-200 ${
+                  access.featured 
+                    ? colorClasses.button + ' text-white' 
+                    : 'border-2 ' + colorClasses.border + ' ' + colorClasses.text + ' hover:bg-gray-50'
+                }`}
+                onClick={() => {
+                  if (access.featured) {
+                    // Mahasiswa Mikroskil - direct to login
+                    navigate('/login')
+                  } else {
+                    // Non-Mikroskil - contact admin (you can implement this later)
+                    alert('Fitur request akses akan segera tersedia. Silakan hubungi admin untuk sementara.')
+                  }
+                }}
+                >
                   {access.action}
                 </button>
               </div>
@@ -241,19 +264,22 @@ export const Features = () => {
         </div>
 
         {/* CTA Section */}
-        <div className="mt-16 text-center bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-8 text-white">
-          <h3 className="text-2xl font-bold mb-4">
+        <div className="mt-16 text-center bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-6 sm:p-8 text-white">
+          <h3 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">
             Siap Memulai Tes?
           </h3>
-          <p className="text-emerald-100 mb-6 max-w-2xl mx-auto">
+          <p className="text-emerald-100 mb-4 sm:mb-6 max-w-2xl mx-auto text-sm sm:text-base">
             Daftarkan diri Anda untuk mengakses platform kami dan mulai tes sekarang juga!
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="px-8 py-3 bg-white text-emerald-600 rounded-lg font-semibold hover:bg-gray-100 transition-colors duration-200">
+          <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 justify-center max-w-md sm:max-w-none mx-auto">
+            <button className="px-6 sm:px-8 py-2.5 sm:py-3 bg-white text-emerald-600 rounded-lg font-semibold hover:bg-gray-100 transition-colors duration-200 text-sm sm:text-base min-h-[44px] touch-manipulation">
               Daftar
             </button>
-            <button className="px-8 py-3 border-2 border-white text-white rounded-lg font-semibold hover:bg-white hover:text-emerald-600 transition-all duration-200">
-              Baca Dokumentasi
+            <button 
+              onClick={() => navigate('/dokumentasi')}
+              className="px-6 sm:px-8 py-2.5 sm:py-3 border-2 border-white text-white rounded-lg font-semibold hover:bg-white hover:text-emerald-600 transition-all duration-200 text-sm sm:text-base min-h-[44px] touch-manipulation"
+            >
+              <span className="truncate">Baca Dokumentasi</span>
             </button>
           </div>
         </div>

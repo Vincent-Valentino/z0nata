@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
-import { QuizDebugPanel } from '@/components/quiz/QuizDebugPanel'
 import { DevToolsAuth } from './DevToolsAuth'
 import { DevToolsAPI } from './DevToolsAPI'
 import { DevToolsSystem } from './DevToolsSystem'
@@ -109,7 +108,23 @@ export const DevToolsPanel = () => {
                 </TabsContent>
                 
                 <TabsContent value="quiz" className="mt-0 p-4 h-full">
-                  <QuizDebugPanel />
+                  <div className="space-y-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Activity className="h-4 w-4" />
+                          Quiz System Testing
+                        </CardTitle>
+                        <CardDescription>Test quiz functionality and debug quiz sessions</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-sm text-muted-foreground">
+                          <div>Quiz debugging tools have been migrated to the main quiz pages.</div>
+                          <div className="mt-2">Use TimeQuizPage and MockTestPage for testing quiz functionality.</div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
                 </TabsContent>
                 
                 <TabsContent value="api" className="mt-0 p-4 h-full">

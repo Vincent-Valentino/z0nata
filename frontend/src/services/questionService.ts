@@ -120,6 +120,16 @@ export const convertDisplayToRequest = (question: Partial<QuestionDisplay>): Cre
   sample_answer: question.sampleAnswer
 })
 
+export const convertDisplayToUpdateRequest = (question: Partial<QuestionDisplay>): UpdateQuestionRequest => ({
+  title: question.title,
+  difficulty: question.difficulty,
+  points: question.points,
+  is_active: question.isActive,
+  options: question.options?.map(opt => ({ text: opt.text })),
+  correct_answers: question.correctAnswers,
+  sample_answer: question.sampleAnswer
+})
+
 // Question Service
 export const questionService = {
   // Get all questions with filtering and pagination

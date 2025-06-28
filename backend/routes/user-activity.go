@@ -24,5 +24,10 @@ func SetupUserActivityRoutes(router gin.IRouter, userActivityController *control
 		user.GET("/stats", userActivityController.GetUserStats)
 		user.GET("/achievements", userActivityController.GetUserAchievements)
 		user.GET("/performance-summary", userActivityController.GetPerformanceSummary)
+
+		// User Results and Statistics by ID - for viewing specific user results
+		user.GET("/results/:userID", userActivityController.GetUserResultsByUserID)
+		user.GET("/statistics/:userID", userActivityController.GetUserStatsByUserID)
+		user.GET("/history/:userID", userActivityController.GetUserResultsByUserID) // Alternative route for quiz history
 	}
 }

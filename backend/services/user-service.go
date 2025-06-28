@@ -29,8 +29,11 @@ type UserService interface {
 	GetProfile(ctx context.Context, userID primitive.ObjectID) (interface{}, error)
 	UpdateProfile(ctx context.Context, userID primitive.ObjectID, updates map[string]interface{}) error
 	ChangePassword(ctx context.Context, userID primitive.ObjectID, req *models.ChangePasswordRequest) error
-	RequestPasswordReset(ctx context.Context, req *models.PasswordResetRequest) error
+	RequestPasswordReset(ctx context.Context, req *models.PasswordResetRequest) (*models.PasswordResetOptionsResponse, error)
 	ResetPassword(ctx context.Context, req *models.PasswordResetConfirm) error
+	ResetPasswordWithRecoveryCode(ctx context.Context, req *models.PasswordResetWithRecoveryRequest) error
+	GenerateNewRecoveryCodes(ctx context.Context, userID primitive.ObjectID) (*models.RecoveryCodesResponse, error)
+	GetRecoveryCodes(ctx context.Context, userID primitive.ObjectID) (*models.RecoveryCodesResponse, error)
 	OAuthLogin(ctx context.Context, req *models.OAuthRequest) (*models.AuthResponse, error)
 	GetOAuthURL(provider, userType string) (string, error)
 	VerifyEmail(ctx context.Context, token string) error
@@ -41,7 +44,6 @@ type UserService interface {
 type userService struct {
 	userRepo     repository.UserRepository
 	jwtManager   *utils.JWTManager
-	emailService *utils.EmailService
 	config       models.Config
 	oauthConfigs map[string]*oauth2.Config
 }
@@ -49,13 +51,11 @@ type userService struct {
 func NewUserService(
 	userRepo repository.UserRepository,
 	jwtManager *utils.JWTManager,
-	emailService *utils.EmailService,
 	config models.Config,
 ) UserService {
 	service := &userService{
 		userRepo:     userRepo,
 		jwtManager:   jwtManager,
-		emailService: emailService,
 		config:       config,
 		oauthConfigs: make(map[string]*oauth2.Config),
 	}
@@ -142,10 +142,10 @@ func (s *userService) Register(ctx context.Context, req *models.RegisterRequest)
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	// Generate verification token
-	verificationToken, err := utils.GenerateRandomToken(32)
+	// Generate recovery codes for password reset
+	recoveryCodes, err := utils.GenerateRecoveryCodes(8)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate verification token: %w", err)
+		return nil, fmt.Errorf("failed to generate recovery codes: %w", err)
 	}
 
 	// Create user based on type
@@ -160,13 +160,13 @@ func (s *userService) Register(ctx context.Context, req *models.RegisterRequest)
 
 		mahasiswa := &models.UserMahasiswa{
 			User: models.User{
-				FullName:          req.FullName,
-				Email:             req.Email,
-				PasswordHash:      hashedPassword,
-				EmailVerified:     false,
-				VerificationToken: verificationToken,
-				UserType:          models.UserTypeMahasiswa,
-				Status:            models.UserStatusActive, // Mahasiswa are auto-approved
+				FullName:      req.FullName,
+				Email:         req.Email,
+				PasswordHash:  hashedPassword,
+				EmailVerified: true, // Auto-verify since no email service
+				RecoveryCodes: recoveryCodes,
+				UserType:      models.UserTypeMahasiswa,
+				Status:        models.UserStatusActive, // Mahasiswa are auto-approved
 			},
 			NIM:     req.NIM,
 			Faculty: req.Faculty,
@@ -181,12 +181,7 @@ func (s *userService) Register(ctx context.Context, req *models.RegisterRequest)
 			return nil, fmt.Errorf("failed to create mahasiswa: %w", err)
 		}
 
-		// Send verification email
-		verifyURL := fmt.Sprintf("%s/verify-email", s.config.Server.AllowedOrigins[0])
-		if err := s.emailService.SendVerificationEmail(req.Email, verificationToken, verifyURL); err != nil {
-			// Log error but don't fail registration
-			fmt.Printf("Failed to send verification email: %v\n", err)
-		}
+		// Note: Recovery codes will be displayed to user after registration
 
 		// Generate tokens
 		accessToken, err := s.jwtManager.GenerateAccessToken(mahasiswa.ID, mahasiswa.Email, "mahasiswa", false)
@@ -214,13 +209,13 @@ func (s *userService) Register(ctx context.Context, req *models.RegisterRequest)
 	} else if req.UserType == "admin" {
 		admin := &models.Admin{
 			User: models.User{
-				FullName:          req.FullName,
-				Email:             req.Email,
-				PasswordHash:      hashedPassword,
-				EmailVerified:     false,
-				VerificationToken: verificationToken,
-				UserType:          models.UserTypeAdmin,
-				Status:            models.UserStatusActive, // Admins are auto-approved
+				FullName:      req.FullName,
+				Email:         req.Email,
+				PasswordHash:  hashedPassword,
+				EmailVerified: true, // Auto-verify since no email service
+				RecoveryCodes: recoveryCodes,
+				UserType:      models.UserTypeAdmin,
+				Status:        models.UserStatusActive, // Admins are auto-approved
 			},
 			IsAdmin:     true,
 			Permissions: []string{"read", "write", "delete"},
@@ -230,12 +225,7 @@ func (s *userService) Register(ctx context.Context, req *models.RegisterRequest)
 			return nil, fmt.Errorf("failed to create admin: %w", err)
 		}
 
-		// Send verification email
-		verifyURL := fmt.Sprintf("%s/verify-email", s.config.Server.AllowedOrigins[0])
-		if err := s.emailService.SendVerificationEmail(req.Email, verificationToken, verifyURL); err != nil {
-			// Log error but don't fail registration
-			fmt.Printf("Failed to send verification email: %v\n", err)
-		}
+		// Note: Recovery codes will be displayed to admin after registration
 
 		// Generate tokens
 		accessToken, err := s.jwtManager.GenerateAccessToken(admin.ID, admin.Email, "admin", true)
@@ -263,25 +253,20 @@ func (s *userService) Register(ctx context.Context, req *models.RegisterRequest)
 	} else if req.UserType == "user" {
 		// Create regular user (non-mahasiswa)
 		user := &models.User{
-			FullName:          req.FullName,
-			Email:             req.Email,
-			PasswordHash:      hashedPassword,
-			EmailVerified:     false,
-			VerificationToken: verificationToken,
-			UserType:          models.UserTypeExternal,  // Use external type for regular users
-			Status:            models.UserStatusPending, // External users need approval
+			FullName:      req.FullName,
+			Email:         req.Email,
+			PasswordHash:  hashedPassword,
+			EmailVerified: true, // Auto-verify since no email service
+			RecoveryCodes: recoveryCodes,
+			UserType:      models.UserTypeExternal,  // Use external type for regular users
+			Status:        models.UserStatusPending, // External users need approval
 		}
 
 		if err := s.userRepo.Create(ctx, user); err != nil {
 			return nil, fmt.Errorf("failed to create user: %w", err)
 		}
 
-		// Send verification email
-		verifyURL := fmt.Sprintf("%s/verify-email", s.config.Server.AllowedOrigins[0])
-		if err := s.emailService.SendVerificationEmail(req.Email, verificationToken, verifyURL); err != nil {
-			// Log error but don't fail registration
-			fmt.Printf("Failed to send verification email: %v\n", err)
-		}
+		// Note: Recovery codes will be displayed to user after registration
 
 		// Generate tokens
 		accessToken, err := s.jwtManager.GenerateAccessToken(user.ID, user.Email, "user", false)
@@ -521,29 +506,28 @@ func (s *userService) ChangePassword(ctx context.Context, userID primitive.Objec
 	return s.userRepo.UpdatePassword(ctx, userID, hashedPassword)
 }
 
-func (s *userService) RequestPasswordReset(ctx context.Context, req *models.PasswordResetRequest) error {
-	// Get user
+func (s *userService) RequestPasswordReset(ctx context.Context, req *models.PasswordResetRequest) (*models.PasswordResetOptionsResponse, error) {
+	// Check if user exists (but don't reveal if they don't)
 	user, err := s.userRepo.GetByEmail(ctx, req.Email)
-	if err != nil {
-		// Don't reveal if email exists or not
-		return nil
+	hasRecoveryCodes := false
+
+	if err == nil && len(user.RecoveryCodes) > 0 {
+		hasRecoveryCodes = true
 	}
 
-	// Generate reset token
-	resetToken, err := utils.GenerateRandomToken(32)
-	if err != nil {
-		return fmt.Errorf("failed to generate reset token: %w", err)
+	response := &models.PasswordResetOptionsResponse{
+		Message: "Password reset options available:",
+		Options: []string{
+			"Use your recovery codes if available",
+			"Contact administrator for password reset assistance",
+			"Create a new account if necessary",
+		},
+		HasRecoveryCodes: hasRecoveryCodes,
+		SupportContact:   "admin@yourapp.com", // Update with actual support contact
 	}
 
-	// Set reset token with 1 hour expiry
-	expiry := time.Now().Add(time.Hour)
-	if err := s.userRepo.SetResetToken(ctx, user.ID, resetToken, expiry); err != nil {
-		return fmt.Errorf("failed to set reset token: %w", err)
-	}
-
-	// Send password reset email
-	resetURL := fmt.Sprintf("%s/reset-password", s.config.Server.AllowedOrigins[0])
-	return s.emailService.SendPasswordResetEmail(req.Email, resetToken, resetURL)
+	// Don't reveal specific user information for security
+	return response, nil
 }
 
 func (s *userService) ResetPassword(ctx context.Context, req *models.PasswordResetConfirm) error {
@@ -687,43 +671,13 @@ func (s *userService) OAuthLogin(ctx context.Context, req *models.OAuthRequest) 
 }
 
 func (s *userService) VerifyEmail(ctx context.Context, token string) error {
-	user, err := s.userRepo.GetByVerificationToken(ctx, token)
-	if err != nil {
-		return errors.New("invalid verification token")
-	}
-
-	if err := s.userRepo.VerifyEmail(ctx, user.ID); err != nil {
-		return fmt.Errorf("failed to verify email: %w", err)
-	}
-
-	// Send welcome email
-	return s.emailService.SendWelcomeEmail(user.Email, user.FullName)
+	// Since emails are auto-verified during registration, this function
+	// can either be disabled or auto-approve verification attempts
+	return errors.New("email verification is not required - emails are auto-verified during registration")
 }
 
 func (s *userService) ResendVerification(ctx context.Context, email string) error {
-	user, err := s.userRepo.GetByEmail(ctx, email)
-	if err != nil {
-		return errors.New("user not found")
-	}
-
-	if user.EmailVerified {
-		return errors.New("email already verified")
-	}
-
-	// Generate new verification token
-	verificationToken, err := utils.GenerateRandomToken(32)
-	if err != nil {
-		return fmt.Errorf("failed to generate verification token: %w", err)
-	}
-
-	// Update verification token
-	if err := s.userRepo.SetVerificationToken(ctx, user.ID, verificationToken); err != nil {
-		return fmt.Errorf("failed to set verification token: %w", err)
-	}
-
-	// Send verification email
-	verifyURL := fmt.Sprintf("%s/verify-email", s.config.Server.AllowedOrigins[0])
-	return s.emailService.SendVerificationEmail(email, verificationToken, verifyURL)
+	return errors.New("email verification is not required - emails are auto-verified during registration")
 }
 
 // Helper methods for OAuth providers
@@ -1024,6 +978,12 @@ func (s *userService) linkOAuthAccount(ctx context.Context, user *models.User, p
 }
 
 func (s *userService) createOAuthUser(ctx context.Context, email, name, picture, provider, oauthID, userType string) (*models.AuthResponse, error) {
+	// Generate recovery codes for OAuth users
+	recoveryCodes, err := utils.GenerateRecoveryCodes(8)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate recovery codes: %w", err)
+	}
+
 	if userType == "mahasiswa" {
 		mahasiswa := &models.UserMahasiswa{
 			User: models.User{
@@ -1031,6 +991,7 @@ func (s *userService) createOAuthUser(ctx context.Context, email, name, picture,
 				Email:          email,
 				EmailVerified:  true, // OAuth emails are pre-verified
 				ProfilePicture: picture,
+				RecoveryCodes:  recoveryCodes,
 				UserType:       models.UserTypeMahasiswa,
 				Status:         models.UserStatusActive,
 			},
@@ -1088,6 +1049,7 @@ func (s *userService) createOAuthUser(ctx context.Context, email, name, picture,
 				Email:          email,
 				EmailVerified:  true, // OAuth emails are pre-verified
 				ProfilePicture: picture,
+				RecoveryCodes:  recoveryCodes,
 				UserType:       models.UserTypeAdmin,
 				Status:         models.UserStatusActive,
 			},
@@ -1131,10 +1093,7 @@ func (s *userService) createOAuthUser(ctx context.Context, email, name, picture,
 			return nil, fmt.Errorf("failed to store refresh token: %w", err)
 		}
 
-		// Send welcome email
-		if err := s.emailService.SendWelcomeEmail(email, name); err != nil {
-			fmt.Printf("Failed to send welcome email: %v\n", err)
-		}
+		// Note: Welcome emails disabled - no SMTP service configured
 
 		return &models.AuthResponse{
 			User:         admin,
@@ -1149,6 +1108,7 @@ func (s *userService) createOAuthUser(ctx context.Context, email, name, picture,
 			Email:          email,
 			EmailVerified:  true, // OAuth emails are pre-verified
 			ProfilePicture: picture,
+			RecoveryCodes:  recoveryCodes,
 			UserType:       models.UserTypeExternal,
 			Status:         models.UserStatusPending, // External users need approval
 		}
@@ -1189,10 +1149,7 @@ func (s *userService) createOAuthUser(ctx context.Context, email, name, picture,
 			return nil, fmt.Errorf("failed to store refresh token: %w", err)
 		}
 
-		// Send welcome email
-		if err := s.emailService.SendWelcomeEmail(email, name); err != nil {
-			fmt.Printf("Failed to send welcome email: %v\n", err)
-		}
+		// Note: Welcome emails disabled - no SMTP service configured
 
 		return &models.AuthResponse{
 			User:         user,
@@ -1208,4 +1165,89 @@ func (s *userService) createOAuthUser(ctx context.Context, email, name, picture,
 // UpdateLastLogout updates the user's last logout timestamp
 func (s *userService) UpdateLastLogout(userID string) error {
 	return s.userRepo.UpdateLastLogout(userID)
+}
+
+// ResetPasswordWithRecoveryCode allows users to reset password using recovery codes
+func (s *userService) ResetPasswordWithRecoveryCode(ctx context.Context, req *models.PasswordResetWithRecoveryRequest) error {
+	// Get user by email
+	user, err := s.userRepo.GetByEmail(ctx, req.Email)
+	if err != nil {
+		return errors.New("invalid email or recovery code")
+	}
+
+	// Check if recovery code exists and remove it (single use)
+	found := false
+	newCodes := []string{}
+	for _, existingCode := range user.RecoveryCodes {
+		if existingCode == req.RecoveryCode && !found {
+			found = true // Skip this code (use it up)
+		} else {
+			newCodes = append(newCodes, existingCode)
+		}
+	}
+
+	if !found {
+		return errors.New("invalid recovery code")
+	}
+
+	// Hash new password
+	passwordConfig := utils.DefaultPasswordConfig()
+	hashedPassword, err := utils.HashPassword(req.NewPassword, passwordConfig)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	// Update password and recovery codes
+	updates := map[string]interface{}{
+		"password_hash":  hashedPassword,
+		"recovery_codes": newCodes,
+		"updated_at":     time.Now(),
+	}
+
+	return s.userRepo.Update(ctx, user.ID, updates)
+}
+
+// GenerateNewRecoveryCodes generates a new set of recovery codes for a user
+func (s *userService) GenerateNewRecoveryCodes(ctx context.Context, userID primitive.ObjectID) (*models.RecoveryCodesResponse, error) {
+	// Generate new recovery codes
+	newCodes, err := utils.GenerateRecoveryCodes(8)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate recovery codes: %w", err)
+	}
+
+	// Update user with new codes
+	updates := map[string]interface{}{
+		"recovery_codes": newCodes,
+		"updated_at":     time.Now(),
+	}
+
+	if err := s.userRepo.Update(ctx, userID, updates); err != nil {
+		return nil, fmt.Errorf("failed to update recovery codes: %w", err)
+	}
+
+	return &models.RecoveryCodesResponse{
+		Codes:   newCodes,
+		Message: "New recovery codes generated. Please save these codes in a secure location.",
+	}, nil
+}
+
+// GetRecoveryCodes returns the current recovery codes for a user
+func (s *userService) GetRecoveryCodes(ctx context.Context, userID primitive.ObjectID) (*models.RecoveryCodesResponse, error) {
+	// Get user
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, errors.New("user not found")
+	}
+
+	if len(user.RecoveryCodes) == 0 {
+		return &models.RecoveryCodesResponse{
+			Codes:   []string{},
+			Message: "No recovery codes available. Generate new codes if needed.",
+		}, nil
+	}
+
+	return &models.RecoveryCodesResponse{
+		Codes:   user.RecoveryCodes,
+		Message: fmt.Sprintf("You have %d recovery codes remaining.", len(user.RecoveryCodes)),
+	}, nil
 }

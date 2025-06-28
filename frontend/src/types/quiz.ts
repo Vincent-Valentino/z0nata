@@ -146,11 +146,17 @@ export interface SaveAnswerResponse {
   is_correct?: boolean // Only for TimeQuiz
   correct_answer?: string | string[]
   points_earned?: number
+  sample_answer?: string // For essay questions in TimeQuiz
   message: string
 }
 
 export interface NavigateQuestionRequest {
   question_index: number
+}
+
+export interface SkipQuestionRequest {
+  question_index: number
+  time_spent: number
 }
 
 export interface SubmitQuizRequest {

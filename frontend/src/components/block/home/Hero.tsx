@@ -1,8 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { NavbarButton, Tooltip } from '@/components/ui'
+import { useAuthStore } from '@/store/authStore'
 
 export const Hero = () => {
   const [currentWord, setCurrentWord] = useState(0)
+  const [showTestMenu, setShowTestMenu] = useState(false)
+  const navigate = useNavigate()
+  const { isAuthenticated } = useAuthStore()
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  
   const blackWords = ["Halo, ", "Coba ", "Coba ", "Bank "]
   const greenWords = ["Sobat Mikro", "Mock Test", "Time Quiz", "Soal Huawei"]
 
@@ -12,6 +19,44 @@ export const Hero = () => {
     }, 2000)
     return () => clearInterval(interval)
   }, [])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowTestMenu(false)
+      }
+    }
+
+    if (showTestMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showTestMenu])
+
+  const handleStartTest = () => {
+    if (!isAuthenticated) {
+      navigate('/login')
+      return
+    }
+    setShowTestMenu(!showTestMenu)
+  }
+
+  const handleDocumentation = () => {
+    navigate('/dokumentasi')
+  }
+
+  const handleTestSelection = (testType: 'mock' | 'time') => {
+    if (testType === 'mock') {
+      navigate('/mock-test')
+    } else {
+      navigate('/time-quiz')
+    }
+    setShowTestMenu(false)
+  }
 
   const features = [
     { 
@@ -69,19 +114,45 @@ export const Hero = () => {
           </p>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center mb-8 sm:mb-12 px-4">
-            <NavbarButton 
-              variant="primary" 
-              className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-semibold bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-700 hover:to-teal-700 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl"
-            >
-              Mulai Test
-            </NavbarButton>
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center mb-8 sm:mb-12 px-4 relative">
+            <div className="relative" ref={dropdownRef}>
+              <NavbarButton 
+                onClick={handleStartTest}
+                variant="primary" 
+                className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-semibold bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-700 hover:to-teal-700 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl"
+              >
+                {isAuthenticated ? 'Mulai Test' : 'Login untuk Mulai Test'}
+              </NavbarButton>
+              
+              {/* Test Selection Dropdown */}
+              {showTestMenu && isAuthenticated && (
+                <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+                  <div className="p-2">
+                    <button
+                      onClick={() => handleTestSelection('mock')}
+                      className="w-full text-left px-4 py-3 hover:bg-emerald-50 rounded-lg transition-colors"
+                    >
+                      <div className="font-semibold text-emerald-600">Mock Test</div>
+                      <div className="text-sm text-gray-600">60+ soal simulasi ujian</div>
+                    </button>
+                    <button
+                      onClick={() => handleTestSelection('time')}
+                      className="w-full text-left px-4 py-3 hover:bg-blue-50 rounded-lg transition-colors"
+                    >
+                      <div className="font-semibold text-blue-600">Time Quiz</div>
+                      <div className="text-sm text-gray-600">20 soal latihan cepat</div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             
             <NavbarButton 
+              onClick={handleDocumentation}
               variant="secondary" 
-              className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-semibold border-2 border-emerald-600 text-emerald-600 hover:bg-emerald-50 transform hover:scale-105 transition-all duration-200"
+              className="w-full sm:w-auto px-4 sm:px-6 md:px-8 py-2.5 sm:py-3 md:py-4 text-sm sm:text-base md:text-lg font-semibold border-2 border-emerald-600 text-emerald-600 hover:bg-emerald-50 transform hover:scale-105 transition-all duration-200 min-w-0 max-w-xs sm:max-w-none"
             >
-              Baca Dokumentasi
+              <span className="truncate">Baca Dokumentasi</span>
             </NavbarButton>
           </div>
 

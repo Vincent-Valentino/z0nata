@@ -20,23 +20,27 @@ export const TimeQuizNavigationPanel: React.FC<TimeQuizNavigationPanelProps> = (
         <CardTitle className="text-lg">Questions</CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
-        <div className="grid grid-cols-5 lg:grid-cols-4 gap-2">
+        <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {navigationItems.map((item) => (
             <Button
               key={item.index}
               onClick={() => onQuestionNavigation(item.index)}
               variant={item.isCurrent ? "default" : "outline"}
               size="sm"
-              className={`relative w-10 h-10 p-0 ${
-                item.isAnswered ? 'bg-green-100 border-green-300 hover:bg-green-200' :
-                item.isSkipped ? 'bg-yellow-100 border-yellow-300 hover:bg-yellow-200' :
-                item.isVisited ? 'bg-blue-100 border-blue-300 hover:bg-blue-200' :
-                ''
+              className={`relative w-10 h-10 sm:w-12 sm:h-12 p-0 text-sm sm:text-base transition-all ${
+                item.isAnswered ? 'bg-green-100 border-green-300 hover:bg-green-200 text-green-800 font-semibold' :
+                item.isSkipped ? 'bg-yellow-100 border-yellow-300 hover:bg-yellow-200 text-yellow-800 font-semibold' :
+                item.isVisited ? 'bg-blue-100 border-blue-300 hover:bg-blue-200 text-blue-800 font-semibold' :
+                item.isCurrent ? 'font-semibold' :
+                'font-medium'
               }`}
             >
               {item.index + 1}
               {item.isAnswered && (
-                <CheckCircle2 className="w-3 h-3 absolute -top-1 -right-1 text-green-600" />
+                <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4 absolute -top-1 -right-1 text-green-600" />
+              )}
+              {item.isSkipped && !item.isAnswered && (
+                <div className="w-3 h-3 sm:w-4 sm:h-4 absolute -top-1 -right-1 bg-yellow-500 rounded-full" />
               )}
             </Button>
           ))}

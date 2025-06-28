@@ -48,10 +48,10 @@ func main() {
 
 	// Initialize utilities
 	jwtManager := utils.NewJWTManager(cfg.JWT)
-	emailService := utils.NewEmailService(cfg.Email)
+	// Note: emailService removed - using recovery codes instead of email for password reset
 
 	// Initialize services
-	userService := services.NewUserService(userRepo, jwtManager, emailService, cfg)
+	userService := services.NewUserService(userRepo, jwtManager, cfg)
 	moduleService := services.NewModuleService(moduleRepo)
 	userActivityService := services.NewUserActivityService(userActivityRepo)
 	questionService := services.NewQuestionService(questionRepo)
@@ -126,21 +126,23 @@ func main() {
 			"version": "v1",
 			"endpoints": gin.H{
 				"auth": gin.H{
-					"POST /auth/register":             "Register new user",
-					"POST /auth/login":                "Login user",
-					"POST /auth/refresh":              "Refresh access token",
-					"POST /auth/logout":               "Logout user (requires auth)",
-					"POST /auth/forgot-password":      "Request password reset",
-					"POST /auth/reset-password":       "Reset password",
-					"GET  /auth/verify-email":         "Verify email",
-					"POST /auth/resend-verification":  "Resend verification email",
-					"GET  /auth/oauth/{provider}/url": "Get OAuth URL",
-					"POST /auth/oauth/callback":       "OAuth callback",
+					"POST /auth/register":                "Register new user",
+					"POST /auth/login":                   "Login user",
+					"POST /auth/refresh":                 "Refresh access token",
+					"POST /auth/logout":                  "Logout user (requires auth)",
+					"POST /auth/request-reset":           "Get password reset options",
+					"POST /auth/reset-password-recovery": "Reset password with recovery code",
+					"GET  /auth/verify-email":            "Email verification (disabled)",
+					"POST /auth/resend-verification":     "Resend verification (disabled)",
+					"GET  /auth/oauth/{provider}/url":    "Get OAuth URL",
+					"POST /auth/oauth/callback":          "OAuth callback",
 				},
 				"user": gin.H{
-					"GET  /user/profile":         "Get user profile (requires auth)",
-					"PUT  /user/profile":         "Update user profile (requires auth)",
-					"POST /user/change-password": "Change password (requires auth)",
+					"GET  /user/profile":           "Get user profile (requires auth)",
+					"PUT  /user/profile":           "Update user profile (requires auth)",
+					"POST /user/change-password":   "Change password (requires auth)",
+					"GET  /user/recovery-codes":    "View current recovery codes (requires auth)",
+					"POST /user/generate-recovery": "Generate new recovery codes (requires auth)",
 				},
 				"mahasiswa": gin.H{
 					"GET /mahasiswa/dashboard": "Mahasiswa dashboard (requires mahasiswa auth)",

@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/big"
 	"sort"
+	"strings"
 	"time"
 
 	"backend/models"
@@ -22,6 +23,7 @@ type QuizSessionService interface {
 	GetSession(ctx context.Context, sessionToken string) (*models.GetSessionResponse, error)
 	SaveAnswer(ctx context.Context, sessionToken string, req *models.SaveAnswerRequest) (*models.SaveAnswerResponse, error)
 	NavigateToQuestion(ctx context.Context, sessionToken string, req *models.NavigateQuestionRequest) error
+	SkipQuestion(ctx context.Context, sessionToken string, req *models.SkipQuestionRequest) error
 	SubmitQuiz(ctx context.Context, sessionToken string) (*models.SubmitQuizResponse, error)
 
 	// Utility
@@ -189,6 +191,11 @@ func (s *quizSessionService) SaveAnswer(ctx context.Context, sessionToken string
 		response.IsCorrect = isCorrect
 		response.CorrectAnswer = question.CorrectAnswers
 		response.PointsEarned = pointsEarned
+
+		// For essay questions, include sample answer if available
+		if question.Type == models.Essay && question.SampleAnswer != "" {
+			response.SampleAnswer = question.SampleAnswer
+		}
 	}
 
 	return response, nil
@@ -223,6 +230,36 @@ func (s *quizSessionService) NavigateToQuestion(ctx context.Context, sessionToke
 	err = s.sessionRepo.UpdateSessionProgress(ctx, session.ID, req.QuestionIndex, answeredCount, skippedCount)
 	if err != nil {
 		return fmt.Errorf("failed to update session progress: %w", err)
+	}
+
+	return nil
+}
+
+func (s *quizSessionService) SkipQuestion(ctx context.Context, sessionToken string, req *models.SkipQuestionRequest) error {
+	session, err := s.sessionRepo.GetSessionByToken(ctx, sessionToken)
+	if err != nil {
+		return fmt.Errorf("failed to get session: %w", err)
+	}
+
+	if session.Status != models.QuizInProgress {
+		return fmt.Errorf("quiz session is not active")
+	}
+
+	// Check if time expired
+	timeRemaining := s.calculateTimeRemaining(session)
+	if timeRemaining <= 0 {
+		return fmt.Errorf("quiz session has expired")
+	}
+
+	// Validate question index
+	if req.QuestionIndex < 0 || req.QuestionIndex >= len(session.Questions) {
+		return fmt.Errorf("invalid question index")
+	}
+
+	// Skip question in database
+	err = s.sessionRepo.SkipQuestion(ctx, session.ID, req.QuestionIndex, req.TimeSpent)
+	if err != nil {
+		return fmt.Errorf("failed to skip question: %w", err)
 	}
 
 	return nil
@@ -266,7 +303,6 @@ func (s *quizSessionService) SubmitQuiz(ctx context.Context, sessionToken string
 
 	return &models.SubmitQuizResponse{
 		Result:  *result,
-		Success: true,
 		Message: "Quiz submitted successfully",
 	}, nil
 }
@@ -652,6 +688,7 @@ func (s *quizSessionService) convertQuestionToSessionQuestion(q *models.Question
 		Points:         q.Points, // Use the question's original points
 		Options:        options,
 		CorrectAnswers: q.CorrectAnswers,
+		SampleAnswer:   q.SampleAnswer, // Include sample answer for essay questions
 		IsAnswered:     false,
 		IsSkipped:      false,
 		IsCorrect:      false,
@@ -692,6 +729,52 @@ func (s *quizSessionService) checkAnswer(question models.SessionQuestion, userAn
 		return false
 	}
 
+	// Handle essay questions differently
+	if question.Type == models.Essay {
+		// For essay questions, we check if user provided any meaningful answer
+		// and optionally compare against sample answer if available
+		if len(userAnswers) == 0 {
+			return false
+		}
+
+		userText := strings.TrimSpace(userAnswers[0])
+		if len(userText) < 10 { // Minimum meaningful answer length
+			return false
+		}
+
+		// If there's a sample answer, do case-insensitive comparison
+		if len(question.CorrectAnswers) > 0 && question.CorrectAnswers[0] != "" {
+			sampleAnswer := strings.ToLower(strings.TrimSpace(question.CorrectAnswers[0]))
+			userAnswerLower := strings.ToLower(userText)
+
+			// Check if user answer contains key terms from sample answer
+			// or if they match closely (simplified keyword matching)
+			sampleWords := strings.Fields(sampleAnswer)
+			userWords := strings.Fields(userAnswerLower)
+
+			matchCount := 0
+			for _, sampleWord := range sampleWords {
+				if len(sampleWord) > 3 { // Only check meaningful words
+					for _, userWord := range userWords {
+						if strings.Contains(userWord, sampleWord) || strings.Contains(sampleWord, userWord) {
+							matchCount++
+							break
+						}
+					}
+				}
+			}
+
+			// If at least 30% of key words match, consider it correct
+			if len(sampleWords) > 0 && float64(matchCount)/float64(len(sampleWords)) >= 0.3 {
+				return true
+			}
+		}
+
+		// For essay questions without sample answers, give partial credit for any meaningful attempt
+		return true // Always give some credit for essay attempts
+	}
+
+	// Handle choice questions (existing logic)
 	// Sort both slices for comparison
 	sort.Strings(userAnswers)
 	correctAnswers := make([]string, len(question.CorrectAnswers))

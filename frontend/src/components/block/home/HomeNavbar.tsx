@@ -59,7 +59,12 @@ export const HomeNavbar = () => {
   }
 
   const handleResultsClick = () => {
-    navigate('/results')
+    if (user?.id) {
+      navigate(`/results/${user.id}`)
+    } else {
+      // Fallback to my-results if user ID is not available
+      navigate('/my-results')
+    }
   }
 
   const getUserInitials = (fullName: string | undefined) => {

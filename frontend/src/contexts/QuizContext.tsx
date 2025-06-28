@@ -79,6 +79,23 @@ function quizReducer(state: QuizState, action: QuizAction): QuizState {
 
     case 'SET_SESSION':
       const session = action.payload
+      const answeredQuestions = new Set<number>()
+      const skippedQuestions = new Set<number>()
+      const visitedQuestions = new Set<number>()
+      
+      // Rebuild question states from session data
+      session.questions.forEach((question, index) => {
+        if (question.is_answered) {
+          answeredQuestions.add(index)
+        }
+        if (question.is_skipped) {
+          skippedQuestions.add(index)
+        }
+        if (question.visit_count > 0) {
+          visitedQuestions.add(index)
+        }
+      })
+
       return {
         ...state,
         session,
@@ -86,6 +103,9 @@ function quizReducer(state: QuizState, action: QuizAction): QuizState {
         currentQuestionIndex: session.current_question,
         answeredCount: session.answered_count,
         skippedCount: session.skipped_count,
+        answeredQuestions,
+        skippedQuestions,
+        visitedQuestions,
         progressPercentage: ((session.answered_count + session.skipped_count) / session.total_questions) * 100
       }
 
@@ -494,25 +514,34 @@ export const QuizProvider: React.FC<QuizProviderProps> = ({ children }) => {
     if (!state.session || index < 0 || index >= state.session.questions.length) return
 
     try {
-      await quizService.navigateToQuestion(state.session.session_token, index)
-      
+      // Update local state immediately for better UX
       dispatch({ type: 'SET_CURRENT_QUESTION', payload: index })
       quizStorage.setCurrentQuestion(index)
+      
+      // Then sync with backend (non-blocking)
+      await quizService.navigateToQuestion(state.session.session_token, index)
     } catch (error: any) {
-      console.error('Failed to navigate to question:', error)
-      toast.error('Failed to navigate to question')
+      console.error('Failed to sync navigation with backend:', error)
+      // Don't show error toast for navigation sync issues as local state is already updated
+      // Only log the error for debugging
+      if (quizService.isQuizExpiredError(error)) {
+        dispatch({ type: 'SET_EXPIRED', payload: true })
+        toast.error('Quiz session has expired')
+      }
     }
   }, [state.session])
 
   const nextQuestion = useCallback(async () => {
     if (state.currentQuestionIndex < state.totalQuestions - 1) {
-      await goToQuestion(state.currentQuestionIndex + 1)
+      const nextIndex = state.currentQuestionIndex + 1
+      await goToQuestion(nextIndex)
     }
   }, [state.currentQuestionIndex, state.totalQuestions, goToQuestion])
 
   const previousQuestion = useCallback(async () => {
     if (state.currentQuestionIndex > 0) {
-      await goToQuestion(state.currentQuestionIndex - 1)
+      const prevIndex = state.currentQuestionIndex - 1
+      await goToQuestion(prevIndex)
     }
   }, [state.currentQuestionIndex, goToQuestion])
 
@@ -521,16 +550,27 @@ export const QuizProvider: React.FC<QuizProviderProps> = ({ children }) => {
     if (!state.session) return
 
     try {
+      // Calculate time spent on this question
+      const timeSpent = state.questionStartTime ? 
+        Math.floor((Date.now() - state.questionStartTime) / 1000) : 0
+
+      // Update local state immediately
       dispatch({ type: 'MARK_QUESTION_SKIPPED', payload: questionIndex })
       
-      // For now, we'll just mark as skipped locally
-      // The backend will handle this when calculating final results
+      // Save to backend to persist skip state
+      await quizService.skipQuestion(state.session.session_token, questionIndex, timeSpent)
+      
       toast.info('Question skipped')
     } catch (error: any) {
       console.error('Failed to skip question:', error)
-      toast.error('Failed to skip question')
+      if (quizService.isQuizExpiredError(error)) {
+        dispatch({ type: 'SET_EXPIRED', payload: true })
+        toast.error('Quiz session has expired')
+      } else {
+        toast.error('Failed to skip question')
+      }
     }
-  }, [state.session])
+  }, [state.session, state.questionStartTime])
 
   // Utility Functions
   const resetQuiz = useCallback(() => {

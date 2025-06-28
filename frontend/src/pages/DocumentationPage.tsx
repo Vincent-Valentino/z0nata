@@ -220,9 +220,9 @@ const DocumentationContent = () => {
 
   // Enhanced Sidebar Component
   const EnhancedSidebar = ({ className = "" }: { className?: string }) => (
-    <div className={cn("flex flex-col h-full bg-background border-r border-border", className)}>
+    <div className={cn("flex flex-col h-screen max-h-screen bg-background border-r border-border", className)}>
       {/* Sidebar Header */}
-      <div className="p-4 border-b border-border bg-card">
+      <div className="p-4 border-b border-border bg-card flex-shrink-0">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-sm">
             <GraduationCap className="w-4 h-4 text-white" />
@@ -248,7 +248,7 @@ const DocumentationContent = () => {
       </div>
 
       {/* Progress Overview */}
-      <div className="p-4 border-b border-border bg-muted/30">
+      <div className="p-4 border-b border-border bg-muted/30 flex-shrink-0">
         <div className="space-y-2">
           <div className="text-sm font-medium text-foreground text-center">
             Documentation Library
@@ -260,10 +260,10 @@ const DocumentationContent = () => {
         </div>
       </div>
 
-      {/* Navigation */}
-      <div className="flex-1 overflow-y-auto p-3">
+      {/* Navigation - Scrollable */}
+      <div className="flex-1 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
         <div className="space-y-3">
-          {filteredSections.map((section, index) => (
+          {filteredSections.map((section) => (
             <div key={section.id} className="space-y-2">
               {/* Module */}
               <div
@@ -291,15 +291,17 @@ const DocumentationContent = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
                         <span className={cn(
-                          "font-semibold text-sm truncate transition-colors",
+                          "font-semibold text-sm transition-colors",
                           activeSection === section.id 
                             ? "text-blue-700 dark:text-blue-300" 
                             : "text-foreground"
-                        )}>
-                          {index + 1}. {section.title}
+                        )}
+                        title={section.title}
+                        >
+                          {section.title}
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground line-clamp-2 text-left leading-relaxed">
+                      <p className="text-xs text-muted-foreground line-clamp-2 text-left leading-relaxed" title={section.description}>
                         {section.description}
                       </p>
                     </div>
@@ -310,7 +312,7 @@ const DocumentationContent = () => {
                 {section.items && section.items.length > 0 && (
                   <div className="px-4 pb-3">
                     <div className="ml-3 border-l-2 border-muted pl-4 space-y-1">
-                      {section.items.map((item, itemIndex) => (
+                      {section.items.map((item) => (
                         <Button
                           key={item.id}
                           variant="ghost"
@@ -329,8 +331,8 @@ const DocumentationContent = () => {
                                 ? "bg-blue-500 dark:bg-blue-400"
                                 : "bg-muted-foreground/40"
                             )} />
-                            <span className="text-sm truncate font-medium">
-                              {index + 1}.{itemIndex + 1} {item.title}
+                            <span className="text-sm font-medium truncate" title={item.title}>
+                              {item.title}
                             </span>
                           </div>
                         </Button>
@@ -345,7 +347,7 @@ const DocumentationContent = () => {
       </div>
 
       {/* Sidebar Footer */}
-      <div className="p-4 border-t border-border bg-card">
+      <div className="p-4 border-t border-border bg-card flex-shrink-0">
         <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
           <span className="font-medium">Quick Actions</span>
         </div>
@@ -426,21 +428,18 @@ const DocumentationContent = () => {
       
       {/* Current section indicator */}
       <div className="px-4 pb-3">
-        <div className="text-xs text-muted-foreground font-medium">
+        <div className="text-xs text-muted-foreground font-medium truncate">
           {(() => {
             const section = sections.find(s => s.id === activeSection)
             if (section) {
-              const moduleIndex = sections.findIndex(s => s.id === activeSection)
-              return `Module ${moduleIndex + 1}: ${section.title}`
+              return section.title
             }
             
-            for (let i = 0; i < modules.length; i++) {
-              const module = modules[i]
+            for (const module of modules || []) {
               if (module.sub_modules && Array.isArray(module.sub_modules)) {
-                const subModuleIndex = module.sub_modules.findIndex(sub => sub.id === activeSection)
-                if (subModuleIndex !== -1) {
-                  const subModule = module.sub_modules[subModuleIndex]
-                  return `${i + 1}.${subModuleIndex + 1}: ${subModule.name}`
+                const subModule = module.sub_modules.find(sub => sub.id === activeSection)
+                if (subModule) {
+                  return `${subModule.name} • ${module.name}`
                 }
               }
             }
@@ -496,9 +495,9 @@ const DocumentationContent = () => {
       <EnhancedMobileNavbar />
       
       {/* Main Layout */}
-      <div className="pt-24 lg:pt-0 flex relative z-10">
+      <div className="pt-24 lg:pt-0 flex relative z-10 h-screen max-h-screen">
         {/* Desktop Sidebar */}
-        <aside className="hidden lg:block w-80 h-screen sticky top-0 border-r border-border">
+        <aside className="hidden lg:block w-80 h-full sticky top-0 border-r border-border">
           <EnhancedSidebar />
         </aside>
 
@@ -510,8 +509,8 @@ const DocumentationContent = () => {
               onClick={() => setIsSidebarOpen(false)}
             />
             
-            <div className="relative flex flex-col w-80 h-full bg-background shadow-xl">
-              <div className="flex items-center justify-between p-4 border-b border-border">
+            <div className="relative flex flex-col w-80 h-full bg-background shadow-xl max-h-screen">
+              <div className="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
                 <h2 className="text-lg font-semibold">Navigation</h2>
                 <Button
                   variant="ghost"
@@ -523,13 +522,15 @@ const DocumentationContent = () => {
                 </Button>
               </div>
               
-              <EnhancedSidebar className="flex-1" />
+              <div className="flex-1 min-h-0">
+                <EnhancedSidebar className="h-full" />
+              </div>
             </div>
           </div>
         )}
 
         {/* Main Content */}
-        <main className="flex-1 min-w-0 relative">
+        <main className="flex-1 min-w-0 relative h-screen max-h-screen overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
           <div className="container mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
             {/* Content Header */}
             <div className="mb-8">
@@ -557,17 +558,14 @@ const DocumentationContent = () => {
                       {(() => {
                         const section = sections.find(s => s.id === activeSection)
                         if (section) {
-                          const moduleIndex = sections.findIndex(s => s.id === activeSection)
-                          return `${moduleIndex + 1}. ${section.title}`
+                          return section.title
                         }
                         
-                        for (let i = 0; i < (modules || []).length; i++) {
-                          const module = modules[i]
+                        for (const module of modules || []) {
                           if (module.sub_modules && Array.isArray(module.sub_modules)) {
-                            const subModuleIndex = module.sub_modules.findIndex(sub => sub.id === activeSection)
-                            if (subModuleIndex !== -1) {
-                              const subModule = module.sub_modules[subModuleIndex]
-                              return `${i + 1}.${subModuleIndex + 1} ${subModule.name}`
+                            const subModule = module.sub_modules.find(sub => sub.id === activeSection)
+                            if (subModule) {
+                              return subModule.name
                             }
                           }
                         }
@@ -627,15 +625,12 @@ const DocumentationContent = () => {
                   >
                     <div className="flex items-start gap-3">
                       <ChevronLeft className="w-5 h-5 mt-0.5 transition-transform group-hover:-translate-x-1 text-muted-foreground group-hover:text-blue-500 dark:group-hover:text-blue-400" />
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <div className="text-xs text-muted-foreground mb-1 font-medium">
                           Previous {previousNav.type === 'submodule' ? 'Submodule' : 'Module'}
                         </div>
-                        <div className="font-semibold text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                          {previousNav.type === 'module' 
-                            ? `${sections.findIndex(s => s.id === previousNav.id) + 1}. ${previousNav.title}`
-                            : previousNav.title
-                          }
+                        <div className="font-semibold text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate">
+                          {previousNav.title}
                         </div>
                       </div>
                     </div>
@@ -649,15 +644,12 @@ const DocumentationContent = () => {
                     className="group justify-end h-auto p-4 text-right sm:col-start-2 bg-background hover:bg-blue-50 dark:bg-muted/10 dark:hover:bg-blue-950/30 hover:border-blue-200 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400 border-muted dark:border-muted/50 text-foreground dark:text-foreground"
                   >
                     <div className="flex items-start gap-3">
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <div className="text-xs text-muted-foreground mb-1 font-medium">
                           Next {nextNav.type === 'submodule' ? 'Submodule' : 'Module'}
                         </div>
-                        <div className="font-semibold text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                          {nextNav.type === 'module' 
-                            ? `${sections.findIndex(s => s.id === nextNav.id) + 1}. ${nextNav.title}`
-                            : nextNav.title
-                          }
+                        <div className="font-semibold text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate">
+                          {nextNav.title}
                         </div>
                       </div>
                       <ChevronRight className="w-5 h-5 mt-0.5 transition-transform group-hover:translate-x-1 text-muted-foreground group-hover:text-blue-500 dark:group-hover:text-blue-400" />

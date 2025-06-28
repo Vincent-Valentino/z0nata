@@ -7,6 +7,7 @@ import { AuthPage } from '@/pages/AuthPage'
 import { AdminPage } from '@/pages/AdminPage'
 import { ProfilePage } from '@/pages/ProfilePage'
 import { ResultsPage } from '@/pages/ResultsPage'
+import UserResultsPage from '@/pages/UserResultsPage'
 import { OAuthCallbackPage } from '@/pages/OAuthCallbackPage'
 import { PrivacyPage } from '@/pages/PrivacyPage'
 
@@ -33,6 +34,7 @@ export const AppRouter = () => {
         {/* User Routes */}
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/results" element={<ResultsPage />} />
+        <Route path="/results/:userId" element={<UserResultsPage />} />
         
         {/* Admin Routes */}
         <Route path="/admin" element={<AdminPage />} />
